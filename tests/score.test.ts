@@ -24,6 +24,7 @@ const tiny = (touches: Touch[], deals: World["deals"] = []): World => ({
   senders: [],
   deals,
   touches,
+  enrollments: [],
 });
 
 describe("Harmony Score", () => {

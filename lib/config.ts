@@ -10,6 +10,7 @@ export const CONFIG = {
   /** Automated / cold sources. Human touches and bookings are never "cold". */
   coldSources: ["sequence", "campaign", "agent", "dialer"] as Source[],
 
+  R1: { lookbackMs: 14 * 24 * HOUR }, // a booking or reply this recent pauses automation
   R3: { windowMs: 24 * HOUR, maxChannels: 2 }, // 3+ channels in 24h → delay
   R4: { windowMs: 7 * 24 * HOUR, maxTouches: 6 }, // >6 touches in 7d → hold
   R5: { windowMs: 48 * HOUR, maxSenders: 1 }, // 2+ senders in 48h → reroute

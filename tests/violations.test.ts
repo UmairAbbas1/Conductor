@@ -21,6 +21,7 @@ const world = (touches: Touch[], deals: World["deals"] = []): World => ({
   senders: [],
   deals,
   touches,
+  enrollments: [],
 });
 const rules = (w: World, id = "c1") => findViolations(w, id).map((v) => v.rule);
 const booking = (contactId: string, hoursAgo: number) =>

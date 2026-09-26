@@ -31,9 +31,10 @@ const log: WriteLog[] = [];
 export const writeLog = () => log;
 
 /** Run a graph8 write, or just record it in dry mode. Returns null in dry mode or on failure. */
-export async function write<T>(op: string, args: unknown, fn: () => Promise<T>): Promise<T | null> {
+export async function write<T>(op: string, args: unknown, fn: () => Promise<T>, sink?: WriteLog[]): Promise<T | null> {
   const entry: WriteLog = { at: new Date().toISOString(), mode: mode(), op, args, ok: true };
   log.push(entry);
+  sink?.push(entry);
   if (mode() === "dry") {
     console.log(`[dry] ${op}`, JSON.stringify(args));
     return null;

@@ -71,6 +71,15 @@ export interface Deal {
   openedAt?: string; // ISO; R2 only applies to touches after the deal opened
 }
 
+export interface Enrollment {
+  contactId: string;
+  sequenceId: string;
+  sequenceName: string;
+  ownerId: string; // sender id of the sequence owner
+  cold: boolean;
+  state: "active" | "paused";
+}
+
 /** Everything the rules and the score need to reason about, in one snapshot. */
 export interface World {
   now: string;
@@ -79,6 +88,7 @@ export interface World {
   senders: Sender[];
   deals: Deal[];
   touches: Touch[];
+  enrollments: Enrollment[];
 }
 
 export const isInbound = (t: Touch) => t.senderId === t.contactId;

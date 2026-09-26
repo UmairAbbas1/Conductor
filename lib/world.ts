@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { SCENARIO, resolveRel } from "../seed/scenario.ts";
-import type { Touch, World } from "./types.ts";
+import type { Enrollment, Touch, World } from "./types.ts";
 
 /** Written by `npm run seed`: scenario keys → real graph8 ids. */
 export interface SeedState {
@@ -31,9 +31,16 @@ export function readSeedState(): SeedState | null {
 
 /**
  * Build the World from the scenario, using real graph8 ids where the seed created them.
- * `extraTouches` are live events already normalized by the ledger.
+ * The overlay carries runtime state: live touches, live enrollments, and enrollments Conductor paused.
  */
-export function buildWorld(now: Date = new Date(), state: SeedState | null = readSeedState(), extraTouches: Touch[] = []): World {
+export interface Overlay {
+  touches?: Touch[];
+  enrollments?: Enrollment[];
+  paused?: string[]; // "contactId|sequenceId"
+}
+
+export function buildWorld(now: Date = new Date(), state: SeedState | null = readSeedState(), overlay: Overlay = {}): World {
+  const extraTouches = overlay.touches ?? [];
   const id = (map: Record<string, string> | undefined, key: string) => map?.[key] ?? key;
   const contactId = (key: string) => id(state?.contacts, key);
   const companyOf = new Map(SCENARIO.contacts.map((c) => [c.key, c.company]));
@@ -72,7 +79,24 @@ export function buildWorld(now: Date = new Date(), state: SeedState | null = rea
       openedAt: resolveRel(d.openedAt, now),
     })),
     touches: [...fixture, ...extraTouches],
+    enrollments: [...scenarioEnrollments(state), ...(overlay.enrollments ?? [])]
+      .filter((e, i, all) => all.findIndex((x) => x.contactId === e.contactId && x.sequenceId === e.sequenceId) === i)
+      .map((e) => (overlay.paused?.includes(`${e.contactId}|${e.sequenceId}`) ? { ...e, state: "paused" as const } : e)),
   };
+}
+
+/** Scenario contacts who got sequence touches are enrolled in the SDR's cold sequence. */
+function scenarioEnrollments(state: SeedState | null): Enrollment[] {
+  const seq = SCENARIO.sequence;
+  const keys = [...new Set(SCENARIO.touches.filter((t) => t.source === "sequence").map((t) => t.contact))];
+  return keys.map((k) => ({
+    contactId: state?.contacts[k] ?? k,
+    sequenceId: state?.sequenceId ?? seq.key,
+    sequenceName: seq.name,
+    ownerId: seq.owner,
+    cold: true,
+    state: "active" as const,
+  }));
 }
 
 /** Find a contact by graph8 id or scenario key (so /mirror/sarah also works). */
