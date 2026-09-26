@@ -25,6 +25,8 @@ export interface ConductorState {
   lastPollAt?: string;
   seenEvents?: string[]; // graph8 event ids already handled
   knownEnrollments?: string[]; // "contactId|sequenceId" seen by the poller
+  /** Live deal amount/stage from graph8, by deal id (refreshed by the poller). */
+  dealSync?: Record<string, { amount: number; open: boolean; stage: string; at: string }>;
 }
 
 const FILE = path.join(DATA_DIR, "conductor-state.json");

@@ -60,6 +60,23 @@ export async function pollOnce(): Promise<number> {
     }
   }
 
+  // 3. Deal amounts and stages, so "pipeline protected" is real graph8 data (every ~30s is plenty).
+  const lastSync = Object.values(st.dealSync ?? {})[0]?.at;
+  if (!lastSync || Date.now() - new Date(lastSync).getTime() > 30_000) {
+    st.dealSync ??= {};
+    for (const dealId of Object.values(seed.deals)) {
+      const d = (await g8.deals.get(dealId)) as any;
+      const deal = d?.data ?? d;
+      const stage = String(deal?.stage_name ?? deal?.stage ?? "");
+      st.dealSync[dealId] = {
+        amount: Number(deal?.amount ?? deal?.value ?? 0),
+        open: !/closed|won|lost/i.test(stage),
+        stage,
+        at: new Date().toISOString(),
+      };
+    }
+  }
+
   st.lastPollAt = new Date().toISOString();
   save();
   return handled;

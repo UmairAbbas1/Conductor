@@ -9,7 +9,7 @@ import type { Decision, Enrollment, Touch, World } from "./types.ts";
 /** The world as Conductor currently sees it: scenario + seed ids + live events + its own pauses. */
 export function currentWorld(now = new Date()): World {
   const st = state();
-  return buildWorld(now, readSeedState(), { touches: st.liveTouches, enrollments: st.liveEnrollments, paused: st.paused });
+  return buildWorld(now, readSeedState(), { touches: st.liveTouches, enrollments: st.liveEnrollments, paused: st.paused, deals: st.dealSync });
 }
 
 /** Enrollments a decision pauses: the sequences named in its evidence that are still active. */
@@ -18,7 +18,11 @@ function toPause(w: World, d: Decision): Enrollment[] {
   return w.enrollments.filter((e) => e.contactId === d.contactId && e.state === "active" && d.evidence.includes(e.sequenceId));
 }
 
-/** Record a decision once, apply it (local pause + graph8 write-back), and return it. */
+/**
+ * Record a decision once, apply it (local pause + graph8 write-back), and return it.
+ * The decision is stored BEFORE the slow graph8 calls, so a concurrent request for the same
+ * situation sees it and never writes a second note or task.
+ */
 async function commit(w: World, d: Decision, origin: DecisionOrigin): Promise<StoredDecision | null> {
   if (hasDecision(d.id)) return null;
   const contact = w.contacts.find((c) => c.id === d.contactId);
@@ -29,9 +33,13 @@ async function commit(w: World, d: Decision, origin: DecisionOrigin): Promise<St
     origin,
     contactName: contact?.name ?? d.contactId,
     companyId: contact?.companyId ?? "",
-    writeback: d.decision === "allow" ? [] : await writeBack(w, d, pauses, readSeedState()),
+    writeback: [],
   };
   addDecision(stored);
+  if (d.decision !== "allow") {
+    stored.writeback = await writeBack(w, d, pauses, readSeedState());
+    save();
+  }
   return stored;
 }
 
@@ -116,13 +124,13 @@ export function stats(w: World = currentWorld()): Stats {
   const acted = ds.filter((d) => d.decision !== "allow");
   const affected = new Set(acted.map((d) => d.companyId));
   const pipeline = w.deals.filter((d) => d.open && affected.has(d.companyId)).reduce((s, d) => s + d.amount, 0);
-  const seed = readSeedState();
+  const synced = Object.keys(state().dealSync ?? {}).length > 0;
   return {
     decisions: ds.length,
     autonomousPct: ds.length ? Math.round((100 * ds.filter((d) => d.autonomous).length) / ds.length) : 100,
     touchesPrevented: acted.filter((d) => d.decision !== "escalate").length,
     pipelineProtected: pipeline,
-    pipelineSource: seed && Object.keys(seed.deals).length ? "graph8" : "scenario",
+    pipelineSource: synced ? "graph8" : "scenario",
   };
 }
 

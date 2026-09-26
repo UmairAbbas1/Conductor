@@ -37,6 +37,8 @@ export interface Overlay {
   touches?: Touch[];
   enrollments?: Enrollment[];
   paused?: string[]; // "contactId|sequenceId"
+  /** Live deal values from graph8; override the scenario's amount/open flag. */
+  deals?: Record<string, { amount: number; open: boolean }>;
 }
 
 export function buildWorld(now: Date = new Date(), state: SeedState | null = readSeedState(), overlay: Overlay = {}): World {
@@ -69,15 +71,19 @@ export function buildWorld(now: Date = new Date(), state: SeedState | null = rea
       email: `${c.first}.${c.last}@${SCENARIO.companies.find((co) => co.key === c.company)!.domain}`.toLowerCase(),
     })),
     senders: SCENARIO.senders.map((s) => ({ id: s.key, name: s.name, role: s.role, memberId: state?.members[s.key] })),
-    deals: SCENARIO.deals.map((d) => ({
-      id: id(state?.deals, d.key),
-      companyId: id(state?.companies, d.company),
-      name: d.name,
-      amount: d.amount,
-      ownerId: d.owner,
-      open: true,
-      openedAt: resolveRel(d.openedAt, now),
-    })),
+    deals: SCENARIO.deals.map((d) => {
+      const dealId = id(state?.deals, d.key);
+      const live = overlay.deals?.[dealId];
+      return {
+        id: dealId,
+        companyId: id(state?.companies, d.company),
+        name: d.name,
+        amount: live?.amount ?? d.amount,
+        ownerId: d.owner,
+        open: live?.open ?? true,
+        openedAt: resolveRel(d.openedAt, now),
+      };
+    }),
     touches: [...fixture, ...extraTouches],
     enrollments: [...scenarioEnrollments(state), ...(overlay.enrollments ?? [])]
       .filter((e, i, all) => all.findIndex((x) => x.contactId === e.contactId && x.sequenceId === e.sequenceId) === i)

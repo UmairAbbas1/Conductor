@@ -15,6 +15,8 @@ dotenv.config({ path: ".env.local", quiet: true });
 const FIELDS = ["harmony_score", "touch_budget_remaining", "conductor_hold"];
 const emailOf = (c: (typeof SCENARIO.contacts)[number]) =>
   `${c.first}.${c.last}@${SCENARIO.companies.find((co) => co.key === c.company)!.domain}`.toLowerCase();
+/** graph8 create calls return `{ data: record }`; list calls return `{ data: [...] }`. */
+const one = (r: unknown): any => (r as any)?.data && !Array.isArray((r as any).data) ? (r as any).data : r;
 const rows = (r: unknown): any[] => {
   const x = r as any;
   return Array.isArray(x) ? x : Array.isArray(x?.data) ? x.data : Array.isArray(x?.data?.items) ? x.data.items : Array.isArray(x?.items) ? x.items : [];
@@ -40,7 +42,7 @@ async function main() {
   // 1. The tag list.
   const lists = rows(await g8.lists.list(1, 100));
   let list = lists.find((l) => l.title === DEMO_TAG);
-  if (!list) list = await write("lists.create", { title: DEMO_TAG }, () => g8.lists.create(DEMO_TAG, "contacts"));
+  if (!list) list = one(await write("lists.create", { title: DEMO_TAG }, () => g8.lists.create(DEMO_TAG, "contacts")));
   state.listId = list?.id ?? prev?.listId;
   console.log(`✓ list ${DEMO_TAG} → ${state.listId ?? "(dry)"}`);
 
@@ -59,7 +61,7 @@ async function main() {
   // 3. Companies (find by domain, else create).
   for (const c of SCENARIO.companies) {
     const found = rows(await g8.companies.list({ domain: c.domain })).find((x) => x.domain === c.domain);
-    const co = found ?? (await write("companies.create", { domain: c.domain, name: c.name }, () => g8.companies.create({ domain: c.domain, name: c.name })));
+    const co = found ?? one(await write("companies.create", { domain: c.domain, name: c.name }, () => g8.companies.create({ domain: c.domain, name: c.name })));
     if (co?.id) state.companies[c.key] = String(co.id);
   }
   console.log(`✓ companies: ${JSON.stringify(state.companies)}`);
@@ -69,7 +71,7 @@ async function main() {
     const email = emailOf(c);
     const found = rows(await g8.contacts.list({ email })).find((x) => x.work_email?.toLowerCase() === email);
     const params = { work_email: email, first_name: c.first, last_name: c.last, job_title: c.title, company_domain: SCENARIO.companies.find((co) => co.key === c.company)!.domain, list_id: state.listId };
-    const contact = found ?? (await write("contacts.create", params, () => g8.contacts.create(params, `conductor-demo-${c.key}`)));
+    const contact = found ?? one(await write("contacts.create", params, () => g8.contacts.create(params, `conductor-demo-${c.key}`)));
     if (contact?.id) {
       state.contacts[c.key] = String(contact.id);
       if (found && state.listId) await write("lists.addContacts", { listId: state.listId, ids: [contact.id] }, () => g8.lists.addContacts(state.listId!, [contact.id]));
@@ -83,16 +85,17 @@ async function main() {
     const contactId = state.contacts[d.contact];
     const existing = companyId ? rows(await g8.deals.forCompany(Number(companyId))).find((x) => x.name === d.name) : undefined;
     const owner = state.members[d.owner];
-    const params = { name: d.name, owner_id: owner ?? "", contact_ids: contactId ? [Number(contactId)] : [], amount: d.amount, currency: "USD", company_id: companyId ? Number(companyId) : undefined };
-    const deal = existing ?? (owner ? await write("deals.create", params, () => g8.deals.create(params)) : null);
-    if (deal?.id) state.deals[d.key] = String(deal.id);
+    const params = { name: d.name, owner_id: owner ?? "", contact_ids: contactId ? [Number(contactId)] : [], amount: d.amount, currency: "USD" }; // company is derived from the contact
+    const deal = existing ?? (owner && params.contact_ids.length ? one(await write("deals.create", params, () => g8.deals.create(params))) : null);
+    const dealId = deal?.id ?? deal?.deal_id; // lookups return deal_id, creates return id
+    if (dealId) state.deals[d.key] = String(dealId);
   }
   console.log(`✓ deals: ${JSON.stringify(state.deals)}`);
 
   // 6. Custom fields (text only — see CAPABILITIES.md).
   const fields = rows(await g8.fields.listContactFields());
   for (const title of FIELDS) {
-    const f = fields.find((x) => x.title === title || x.name === title) ?? (await write("fields.create", { title }, () => g8.fields.create({ title, entity: "contacts", data_type: "text" })));
+    const f = fields.find((x) => x.title === title || x.name === title) ?? one(await write("fields.create", { title }, () => g8.fields.create({ title, entity: "contacts", data_type: "text" })));
     if (f?.id) state.fields[title] = Number(f.id);
   }
   console.log(`✓ fields: ${JSON.stringify(state.fields)}`);
@@ -112,7 +115,7 @@ async function main() {
       { step_order: 2, step_type: "EMAIL", input_type: "MANUAL_TEMPLATE", time_interval: 259200, step_data: { subject: "Re: quick question", body: "Bumping this. Still evaluating for October?" } },
     ],
   };
-  const created = seq ?? (ownerEmail ? await write("sequences.create", seqParams, () => g8.sequences.create(seqParams, "conductor-demo-sequence")) : null);
+  const created = seq ?? (ownerEmail ? one(await write("sequences.create", seqParams, () => g8.sequences.create(seqParams, "conductor-demo-sequence"))) : null);
   state.sequenceId = created?.id ?? undefined;
   console.log(`✓ sequence: ${state.sequenceId ?? "(dry)"} ${seq ? `(existing, status ${seq.status})` : ""}`);
 
