@@ -32,6 +32,44 @@ interface ApiState {
   heatmap: Account[];
   senders: Record<string, string>;
   decisions: FeedDecision[];
+  poll: { running: boolean; lastPollAt?: string; error?: string };
+}
+
+const SIM_KINDS: [string, string][] = [
+  ["meeting.booked", "Books a meeting"],
+  ["engagement.email_replied", "Replies"],
+  ["sequence.contact_enrolled", "Enrolled in SDR sequence"],
+  ["voice_ai.call_completed", "AI voice agent calls"],
+  ["engagement.sms_sent", "Gets an SMS"],
+];
+
+/** Hidden demo fallback (press "." to toggle): injects graph8-shaped events through the real intake path. */
+function Simulator({ contacts }: { contacts: { id: string; name: string }[] }) {
+  const [contact, setContact] = useState(contacts[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const fire = async (kind: string) => {
+    setBusy(true);
+    await fetch("/api/simulate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, contact }) });
+    setBusy(false);
+  };
+  return (
+    <div className="fixed bottom-5 right-5 z-50 w-80 rounded-2xl border border-line bg-panel p-4 shadow-2xl">
+      <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-mute">Simulate graph8 event</div>
+      <select value={contact} onChange={(e) => setContact(e.target.value)} className="mb-3 w-full rounded-lg border border-line bg-panel-2 px-2 py-1.5 text-sm">
+        {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <div className="grid gap-1.5">
+        {SIM_KINDS.map(([k, label]) => (
+          <button key={k} disabled={busy} onClick={() => fire(k)} className="rounded-lg border border-line px-3 py-1.5 text-left text-sm text-soft hover:bg-panel-2 hover:text-text disabled:opacity-50">
+            {label}
+          </button>
+        ))}
+        <button onClick={() => fetch("/api/state", { method: "DELETE" })} className="mt-1 rounded-lg px-3 py-1 text-left text-[11px] text-mute hover:text-bad">
+          Reset demo state
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const KIND: Record<string, string> = {
@@ -61,6 +99,16 @@ export function Dashboard() {
   const [data, setData] = useState<ApiState | null>(null);
   const seen = useRef<Set<string> | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [sim, setSim] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has("sim")) setSim(true);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "." && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement)) setSim((s) => !s);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -139,7 +187,14 @@ export function Dashboard() {
         <section className="rounded-3xl border border-line bg-panel/70 p-6">
           <div className="mb-4 flex items-center justify-between">
             <span className="text-xs uppercase tracking-[0.2em] text-mute">Decision feed</span>
-            <span className="flex items-center gap-1.5 text-[11px] text-good"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />live</span>
+            {data.poll.error ? (
+              <span className="text-[11px] text-bad" title={data.poll.error}>graph8 polling stopped</span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-[11px] text-good" title={data.poll.lastPollAt ? `last graph8 poll ${ago(data.poll.lastPollAt)}` : "waiting for seed"}>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
+                {data.seeded && data.poll.running ? "live · graph8 every 5s" : "live"}
+              </span>
+            )}
           </div>
           <ol className="scroll-thin max-h-[560px] space-y-3 overflow-y-auto pr-1">
             {decisions.map((d) => (
@@ -169,6 +224,7 @@ export function Dashboard() {
           </ol>
         </section>
       </div>
+      {sim && <Simulator contacts={heatmap.flatMap((a) => a.contacts)} />}
     </div>
   );
 }

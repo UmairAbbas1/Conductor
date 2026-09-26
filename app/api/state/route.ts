@@ -3,6 +3,7 @@ import { currentWorld, ensureScanned, heatmap, stats } from "@/lib/engine.ts";
 import { resetState, state } from "@/lib/store.ts";
 import { mode } from "@/lib/graph8.ts";
 import { readSeedState } from "@/lib/world.ts";
+import { pollStatus } from "@/lib/poller.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function GET() {
     heatmap: heatmap(w),
     senders,
     decisions: state().decisions.slice(0, 40),
-    lastPollAt: state().lastPollAt ?? null,
+    poll: pollStatus(),
   });
 }
 

@@ -20,6 +20,8 @@ export interface ConductorState {
   paused: string[]; // "contactId|sequenceId"
   scannedAt?: string;
   lastPollAt?: string;
+  seenEvents?: string[]; // graph8 event ids already handled
+  knownEnrollments?: string[]; // "contactId|sequenceId" seen by the poller
 }
 
 const FILE = path.join(DATA_DIR, "conductor-state.json");

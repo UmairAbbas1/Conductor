@@ -18,7 +18,7 @@ export interface SeedState {
   fields: Record<string, number>;
 }
 
-export const DATA_DIR = path.join(process.cwd(), "data");
+export const DATA_DIR = process.env.CONDUCTOR_DATA_DIR ?? path.join(process.cwd(), "data");
 export const SEED_STATE_FILE = path.join(DATA_DIR, "seed-state.json");
 
 export function readSeedState(): SeedState | null {

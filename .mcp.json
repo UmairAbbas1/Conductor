@@ -1,1 +1,6 @@
-{"mcpServers":{"graph8":{"type":"http","url":"https://be.graph8.com/mcp/"}}}
+{
+  "mcpServers": {
+    "graph8": { "type": "http", "url": "https://be.graph8.com/mcp/" },
+    "conductor": { "type": "stdio", "command": "node", "args": ["mcp/conductor.ts"] }
+  }
+}
