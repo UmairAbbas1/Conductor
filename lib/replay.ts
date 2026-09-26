@@ -8,6 +8,9 @@ export interface ReplayStep {
   /** What Conductor would have done at that moment, seeing only what had been sent so far. */
   decision: Decision | null;
   kept: boolean;
+  /** Harmony Score right after this moment, without and with Conductor (for live dials). */
+  scoreWithout: number;
+  scoreWith: number;
 }
 
 export interface Replay {
@@ -29,18 +32,24 @@ export function replayWeek(world: World, contactId: string): Replay {
   const others = world.touches.filter((t) => t.contactId !== contactId);
 
   const kept: Touch[] = [];
+  const sent: Touch[] = [];
   const steps: ReplayStep[] = [];
+  const scoresAt = (now: string) => ({
+    scoreWithout: harmonyScore({ ...world, now, touches: [...others, ...sent] }, contactId).score,
+    scoreWith: harmonyScore({ ...world, now, touches: [...others, ...kept] }, contactId).score,
+  });
   for (const t of week) {
+    sent.push(t);
     if (isInbound(t)) {
       kept.push(t);
-      steps.push({ touch: t, inbound: true, decision: null, kept: true });
+      steps.push({ touch: t, inbound: true, decision: null, kept: true, ...scoresAt(t.timestamp) });
       continue;
     }
     const snapshot: World = { ...world, now: t.timestamp, touches: [...others, ...kept], enrollments: [] };
     const decision = evaluateAction(snapshot, { contactId, action: "send", channel: t.channel, source: t.source, senderId: t.senderId, snippet: t.snippet });
     const ok = decision.decision === "allow" || decision.decision === "escalate";
     if (ok) kept.push(t);
-    steps.push({ touch: t, inbound: false, decision, kept: ok });
+    steps.push({ touch: t, inbound: false, decision, kept: ok, ...scoresAt(t.timestamp) });
   }
 
   const outbound = (ts: Touch[]) => ts.filter((t) => !isInbound(t)).length;
