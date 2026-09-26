@@ -3,6 +3,7 @@ import path from "node:path";
 import { DATA_DIR } from "./world.ts";
 import type { Decision, Enrollment, Touch } from "./types.ts";
 import type { WriteLog } from "./graph8.ts";
+import type { ContradictionCheck, MergedMessage } from "./llm.ts";
 
 export type DecisionOrigin = "scan" | "event" | "preflight" | "simulate";
 
@@ -11,6 +12,8 @@ export interface StoredDecision extends Decision {
   contactName: string;
   companyId: string;
   writeback: WriteLog[];
+  /** LLM layer output, when a message was checked (see lib/llm.ts). */
+  llm?: { contradiction?: ContradictionCheck; merged?: MergedMessage & { ownerId?: string } };
 }
 
 export interface ConductorState {

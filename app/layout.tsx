@@ -24,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav className="flex items-center gap-6 text-sm text-soft">
             <Link href="/" className="hover:text-text">Accounts</Link>
             <Link href="/mirror/sarah" className="hover:text-text">Buyer Mirror</Link>
+            <Link href="/replay" className="hover:text-text">Replay</Link>
             <span className={`rounded-full border px-2.5 py-0.5 text-xs ${live ? "border-good/40 text-good" : "border-warn/40 text-warn"}`}>
               {live ? "LIVE" : "DRY RUN"}
             </span>

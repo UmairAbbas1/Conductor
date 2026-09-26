@@ -17,6 +17,7 @@ interface FeedDecision {
   origin: string;
   instead?: { type: string; ownerId: string };
   writeback: WriteLog[];
+  llm?: { contradiction?: { status: string; contradiction?: boolean; explanation?: string; reason?: string }; merged?: { status: string; message?: string } };
 }
 interface Account {
   id: string;
@@ -208,6 +209,11 @@ export function Dashboard() {
                   <span className="text-[10px] text-mute">{ago(d.createdAt)}</span>
                 </div>
                 <p className="mt-2 text-[13px] leading-snug text-soft">{d.reason}</p>
+                {d.llm?.contradiction?.status === "ok" && d.llm.contradiction.contradiction && (
+                  <p className="mt-1.5 text-[12px] text-bad">✦ LLM: {d.llm.contradiction.explanation}</p>
+                )}
+                {d.llm?.contradiction?.status === "skipped" && <p className="mt-1.5 text-[11px] text-mute">✦ LLM check skipped ({d.llm.contradiction.reason})</p>}
+                {d.llm?.merged?.status === "ok" && <p className="mt-1.5 text-[12px] text-accent">✦ Merged into one message from the owner</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-mute">
                   {d.instead && <span>→ {d.instead.type.replace("_", " ")}: {senders[d.instead.ownerId] ?? d.instead.ownerId}</span>}
                   <span>{d.autonomous ? "autonomous" : "waiting for owner"}</span>

@@ -4,6 +4,7 @@ import { buildWorld, findContact } from "@/lib/world.ts";
 import { buildMirror, type MirrorItem } from "@/lib/mirror.ts";
 import { CONFIG } from "@/lib/config.ts";
 import { ScoreDial } from "@/app/components/ScoreDial.tsx";
+import { QueuedNext } from "@/app/components/QueuedNext.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,8 @@ export default async function MirrorPage({ params }: { params: Promise<{ contact
           </ul>
           <p className="mt-4 text-xs text-mute">Starts at 100. Fixed penalty per violation in the last 7 days, capped per rule (lib/config.ts).</p>
         </div>
+
+        <QueuedNext contactId={contact.id} />
 
         {colleagues.length > 0 && (
           <div className="text-sm text-mute">

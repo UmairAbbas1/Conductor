@@ -81,12 +81,14 @@ export function evaluateAction(w: World, a: ProposedAction): Decision {
       ? decision(w, a.contactId, rule, "escalate", `${reason}. A rep is acting, so the owner decides.`, evidence, { instead: extra.instead ?? (c.deal ? { type: "task", ownerId: c.deal.ownerId } : undefined) }, key)
       : decision(w, a.contactId, rule, kind, reason, evidence, extra, key);
 
-  // R1: the buyer (or a colleague, for cold sequences) already engaged.
+  // R1: the buyer (or a colleague, for cold sequences) already engaged. Hand them to the single owner.
   if (isColdAction(a) && !human) {
+    const owner = ownerFor(w, a.contactId);
+    const handoff = owner && owner !== a.senderId ? { instead: { type: "handoff", ownerId: owner } } : {};
     if (c.ownEngagement)
-      return hit("R1", "hold", `${name} ${engagedHow(c.ownEngagement)}. Automated outreach is paused`, [c.ownEngagement.refId]);
+      return hit("R1", "hold", `${name} ${engagedHow(c.ownEngagement)}. Automated outreach is paused`, [c.ownEngagement.refId], handoff);
     if (c.colleagueEngagement && a.source === "sequence")
-      return hit("R1", "hold", `A colleague at ${name}'s company ${engagedHow(c.colleagueEngagement)}. Cold sequences are paused for the account`, [c.colleagueEngagement.refId]);
+      return hit("R1", "hold", `A colleague at ${name}'s company ${engagedHow(c.colleagueEngagement)}. Cold sequences are paused for the account`, [c.colleagueEngagement.refId], handoff);
   }
 
   // R2: open deal on the company → no cold enrollment; the deal owner gets a task instead.

@@ -55,7 +55,7 @@ export const SCENARIO: Scenario = {
     { key: "nova", name: "Nova", role: "AI voice agent" },
   ],
   deals: [
-    { key: "acme-pilot", company: "acme", contact: "sarah", name: "Acme — Ops Pilot", amount: 42000, owner: "ali", openedAt: { d: -5, at: "17:00" } },
+    { key: "acme-pilot", company: "acme", contact: "sarah", name: "Acme — Ops Pilot", amount: 42000, owner: "ali", openedAt: { d: -6, at: "08:00" } },
     { key: "initech-expansion", company: "initech", contact: "marco", name: "Initech — Expansion", amount: 18500, owner: "ali", openedAt: { d: -7, at: "09:00" } },
   ],
   sequence: { key: "bilal-cold", name: "Bilal — Ops Leaders Cold Outbound", owner: "bilal" },
@@ -89,6 +89,24 @@ export const SCENARIO: Scenario = {
     { ref: "m7", contact: "marco", channel: "email", source: "human", sender: "ali", when: { d: -2, at: "10:00" }, snippet: "Marco, can we lock the expansion scope on Friday?" },
   ],
 };
+
+/** What graph8 automations are about to send next: the Mirror preflights these live. */
+export interface QueuedTouch {
+  ref: string;
+  contact: string;
+  channel: Channel;
+  source: Source;
+  sender: string;
+  snippet: string;
+}
+
+export const QUEUED: QueuedTouch[] = [
+  { ref: "q1", contact: "sarah", channel: "email", source: "sequence", sender: "bilal", snippet: "Sarah, circling back one last time. Are you still evaluating ops platforms for an October rollout? Happy to set up an intro call." },
+  { ref: "q2", contact: "sarah", channel: "voice_agent", source: "agent", sender: "nova", snippet: "Hi Sarah, this is Nova from graph8. Is now a good time to learn how we help ops teams cut handoff delays?" },
+  { ref: "q3", contact: "hina", channel: "linkedin", source: "sequence", sender: "bilal", snippet: "Hi Hina, would love to connect and share how ops teams like Acme's cut handoffs." },
+  { ref: "q4", contact: "lina", channel: "email", source: "sequence", sender: "bilal", snippet: "Lina, one last note on peak-season routing. Worth 15 minutes?" },
+  { ref: "q5", contact: "marco", channel: "sms", source: "sequence", sender: "bilal", snippet: "Marco, Bilal from graph8 again. Still keen to show you the platform?" },
+];
 
 /** Resolve a relative time against the start of `today` (local time). */
 export function resolveRel(rel: RelTime, today: Date): string {

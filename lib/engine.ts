@@ -1,6 +1,7 @@
 import { buildWorld, readSeedState } from "./world.ts";
 import { evaluateAction, evaluateContact, type ProposedAction } from "./policies.ts";
 import { writeBack } from "./writeback.ts";
+import { checkContradiction, mergeMessages } from "./llm.ts";
 import { accountScore, harmonyScore } from "./score.ts";
 import { addDecision, hasDecision, markPaused, save, state, type DecisionOrigin, type StoredDecision } from "./store.ts";
 import type { Decision, Enrollment, Touch, World } from "./types.ts";
@@ -78,11 +79,28 @@ export async function ingestEnrollment(e: Enrollment, origin: DecisionOrigin = "
   return commit(w, withSeq, origin);
 }
 
-/** POST /api/preflight and the MCP tool: decide, record, apply. */
+/**
+ * POST /api/preflight and the MCP tool: decide with the rules, record, apply. When the action carries
+ * the message text, the LLM layer also (a) checks it against what the buyer already did and (b) for a
+ * blocked message with an owner, merges it with the owner's last message into one voice.
+ */
 export async function preflight(a: ProposedAction): Promise<StoredDecision | Decision> {
   const w = currentWorld();
   const d = evaluateAction(w, a);
-  return (await commit(w, d, "preflight")) ?? d;
+  const stored = (await commit(w, d, "preflight")) ?? state().decisions.find((x) => x.id === d.id);
+  if (!stored || !a.snippet || stored.llm) return stored ?? d;
+
+  const ownerId = d.instead?.ownerId;
+  const ownerLast = ownerId && ownerId !== a.senderId
+    ? w.touches.filter((t) => t.contactId === a.contactId && t.senderId === ownerId).sort((x, y) => y.timestamp.localeCompare(x.timestamp))[0]
+    : undefined;
+  const [contradiction, merged] = await Promise.all([
+    checkContradiction(w, a.contactId, a.snippet),
+    d.decision !== "allow" && ownerId && ownerLast ? mergeMessages(w, a.contactId, ownerId, a.snippet, ownerLast.snippet) : Promise.resolve(undefined),
+  ]);
+  stored.llm = { contradiction, ...(merged ? { merged: { ...merged, ownerId } } : {}) };
+  save();
+  return stored;
 }
 
 export interface Stats {
