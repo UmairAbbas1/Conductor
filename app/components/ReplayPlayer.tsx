@@ -21,7 +21,6 @@ interface Props {
 }
 
 const DURATION_MS = 16_000; // the whole week plays in 16 seconds
-const TICK_MS = 40;
 const GHOST_MS = 9 * 3600_000; // a blocked touch stays visible for 9 simulated hours, then collapses
 
 const CH: Record<string, { glyph: string; tint: string; label: string }> = {
@@ -38,11 +37,12 @@ const VERB: Record<string, string> = { hold: "Held", delay: "Delayed", reroute: 
 const dayTime = (iso: string | number) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
 const clock = (ms: number) => new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-function Card({ s, senders, ghost }: { s: Step; senders: Record<string, string>; ghost: boolean }) {
+function Card({ s, senders, ghost, fresh }: { s: Step; senders: Record<string, string>; ghost: boolean; fresh: boolean }) {
   const ch = CH[s.touch.channel] ?? CH.email;
+  const anim = fresh ? "feed-in " : "";
   if (s.inbound)
     return (
-      <div className="feed-in flex justify-end">
+      <div className={`${anim}flex justify-end`}>
         <div className="max-w-[85%] rounded-2xl rounded-br-md bg-good/15 px-3.5 py-2 ring-1 ring-good/35">
           <div className="text-[10px] uppercase tracking-wider text-good/80">You · {dayTime(s.touch.timestamp)}</div>
           <div className="mt-0.5 text-[12.5px] leading-snug text-good">{s.touch.snippet}</div>
@@ -50,7 +50,7 @@ function Card({ s, senders, ghost }: { s: Step; senders: Record<string, string>;
       </div>
     );
   return (
-    <div className={`feed-in rounded-2xl px-3 py-2.5 ring-1 ${ghost ? "bg-bad/10 ring-bad/50" : "bg-panel-2 ring-line"}`}>
+    <div className={`${anim}rounded-2xl px-3 py-2.5 ring-1 transition-colors duration-300 ${ghost ? "bg-bad/15 ring-bad/60" : "bg-card ring-card-line"}`}>
       <div className="flex items-center gap-2.5">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold" style={{ background: `${ch.tint}26`, color: ch.tint }}>{ch.glyph}</span>
         <div className="min-w-0 flex-1">
@@ -81,6 +81,18 @@ function Phone({ title, subtitle, count, tone, items, senders, now, ghosts }: {
   ghosts: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
+  // A card animates in for 420ms after it first appears, then renders fully opaque forever,
+  // so no re-render can ever leave it half-faded.
+  const firstSeen = useRef<Map<string, number>>(new Map());
+  const nowMs = typeof performance === "undefined" ? 0 : performance.now();
+  const fresh = new Set<string>();
+  for (const s of items) {
+    const id = s.touch.refId;
+    if (!firstSeen.current.has(id)) firstSeen.current.set(id, nowMs);
+    if (nowMs - firstSeen.current.get(id)! < 420) fresh.add(id);
+  }
+  // Forget cards that left (so they animate again when replayed).
+  for (const id of [...firstSeen.current.keys()]) if (!items.some((s) => s.touch.refId === id)) firstSeen.current.delete(id);
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
   }, [items.length]);
@@ -109,7 +121,7 @@ function Phone({ title, subtitle, count, tone, items, senders, now, ghosts }: {
             {items.length === 0 ? (
               <div className="grid h-full place-items-center text-center text-[12px] text-mute">No messages yet</div>
             ) : (
-              items.map((s) => <Card key={s.touch.refId} s={s} senders={senders} ghost={ghosts && !s.kept} />)
+              items.map((s) => <Card key={s.touch.refId} s={s} senders={senders} ghost={ghosts && !s.kept} fresh={fresh.has(s.touch.refId)} />)
             )}
           </div>
         </div>
@@ -124,25 +136,30 @@ export function ReplayPlayer({ contactName, steps, before, after, senders }: Pro
   const end = Math.max(...times) + GHOST_MS;
   const [t, setT] = useState(end);
   const [playing, setPlaying] = useState(false);
+  const clockRef = useRef(end); // the playhead, advanced once per animation frame
 
   useEffect(() => {
     if (!playing) return;
-    const id = setInterval(() => {
-      setT((cur) => {
-        const next = cur + ((end - start) / DURATION_MS) * TICK_MS;
-        if (next >= end) {
-          setPlaying(false);
-          return end;
-        }
-        return next;
-      });
-    }, TICK_MS);
-    return () => clearInterval(id);
+    let raf = 0;
+    let last = performance.now();
+    const frame = (nowMs: number) => {
+      const next = Math.min(end, clockRef.current + ((end - start) / DURATION_MS) * (nowMs - last));
+      last = nowMs;
+      clockRef.current = next;
+      setT(next);
+      if (next >= end) setPlaying(false);
+      else raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
   }, [playing, start, end]);
 
   const toggle = () => {
     if (playing) return setPlaying(false);
-    if (t >= end) setT(start);
+    if (clockRef.current >= end) {
+      clockRef.current = start;
+      setT(start);
+    }
     setPlaying(true);
   };
 

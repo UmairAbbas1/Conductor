@@ -12,6 +12,8 @@
   --color-warn: #f2b45a;
   --color-bad: #f0706a;
   --color-accent: #8ea8ff;
+  --color-card: #1d222b;
+  --color-card-line: #2c333e;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display), ui-serif, Georgia, serif;
 }
@@ -39,7 +41,14 @@ body {
 }
 
 .feed-in {
-  animation: feed-in 400ms ease-out both;
+  animation: feed-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-in {
+    animation: none;
+  }
 }
 
 .scroll-thin::-webkit-scrollbar {
