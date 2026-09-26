@@ -1,0 +1,10 @@
+{
+  "name": "conductor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@graph8/sdk": "^0.245.0",
+    "dotenv": "^18.0.4"
+  }
+}
