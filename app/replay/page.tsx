@@ -4,8 +4,9 @@ import { ReplayPlayer } from "@/app/components/ReplayPlayer.tsx";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReplayPage({ searchParams }: { searchParams: Promise<{ contact?: string }> }) {
-  const { contact: key = "sarah" } = await searchParams;
+export default async function ReplayPage({ searchParams }: { searchParams: Promise<{ contact?: string; at?: string; autoplay?: string }> }) {
+  const { contact: key = "sarah", at, autoplay } = await searchParams;
+  const initialAt = at !== undefined && Number.isFinite(Number(at)) ? Number(at) : undefined;
   const world = buildWorld();
   const contact = findContact(world, key) ?? findContact(world, "sarah")!;
   const replay = replayWeek(world, contact.id);
@@ -22,7 +23,15 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
           seeing only what had been sent up to that moment.
         </p>
       </div>
-      <ReplayPlayer contactName={contact.name.split(" ")[0]} steps={replay.steps} before={replay.before} after={replay.after} senders={senders} />
+      <ReplayPlayer
+        contactName={contact.name.split(" ")[0]}
+        steps={replay.steps}
+        before={replay.before}
+        after={replay.after}
+        senders={senders}
+        initialAt={initialAt}
+        autoplay={autoplay !== undefined}
+      />
     </div>
   );
 }
