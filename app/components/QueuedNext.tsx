@@ -48,13 +48,13 @@ export function QueuedNext({ contactId }: { contactId: string }) {
             <li key={q.ref} className="feed-in rounded-2xl border border-line bg-panel-2 p-4">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm"><span className="font-medium">{q.senderName}</span> <span className="text-mute">· {q.channel.replace("_", " ")}</span></span>
-                <span className={`rounded-full border px-2 py-px text-[10px] font-semibold uppercase tracking-wider ${KIND[d.decision]}`}>{d.decision} {d.rule !== "none" && d.rule}</span>
+                <span className={`rounded-full border px-2 py-px text-[10px] font-semibold uppercase tracking-wider ${KIND[d.decision]}`}>{({ allow: "Allowed", hold: "Held", delay: "Delayed", reroute: "Rerouted", escalate: "Needs owner" } as Record<string, string>)[d.decision] ?? d.decision}</span>
               </div>
               <p className="mt-2 text-[13px] italic leading-snug text-soft">&ldquo;{q.snippet}&rdquo;</p>
               <p className="mt-2 text-[12px] text-mute">{d.reason}.</p>
-              {c?.status === "ok" && c.contradiction && <p className="mt-2 text-[12px] text-bad">✦ LLM: contradiction. {c.explanation}</p>}
-              {c?.status === "ok" && !c.contradiction && <p className="mt-2 text-[12px] text-good">✦ LLM: consistent with what the buyer already did.</p>}
-              {c?.status === "skipped" && <p className="mt-2 text-[11px] text-mute">✦ LLM check skipped ({c.reason}). Rules still decided.</p>}
+              {c?.status === "ok" && c.contradiction && <p className="mt-2 text-[12px] text-bad">✦ AI: contradiction. {c.explanation}</p>}
+              {c?.status === "ok" && !c.contradiction && <p className="mt-2 text-[12px] text-good">✦ AI: consistent with what the buyer already did.</p>}
+              {c?.status === "skipped" && <p className="mt-2 text-[11px] text-mute">✦ AI check off ({c.reason}). The rules decided on their own.</p>}
               {m?.status === "ok" && (
                 <div className="mt-3 rounded-xl border border-accent/30 bg-accent/5 p-3">
                   <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-accent">One voice · from {senders[m.ownerId ?? ""] ?? m.ownerId}</div>

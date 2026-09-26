@@ -6,6 +6,8 @@ import { accountScore, harmonyScore } from "./score.ts";
 import { addDecision, hasDecision, markPaused, save, state, type DecisionOrigin, type StoredDecision } from "./store.ts";
 import type { Decision, Enrollment, Touch, World } from "./types.ts";
 
+const CHANNEL_LABEL: Record<string, string> = { email: "email", sms: "SMS", linkedin: "LinkedIn", call: "call", voice_agent: "AI call", newsletter: "newsletter", meeting: "meeting" };
+
 /** The world as Conductor currently sees it: scenario + seed ids + live events + its own pauses. */
 export function currentWorld(now = new Date()): World {
   const st = state();
@@ -23,7 +25,7 @@ function toPause(w: World, d: Decision): Enrollment[] {
  * The decision is stored BEFORE the slow graph8 calls, so a concurrent request for the same
  * situation sees it and never writes a second note or task.
  */
-async function commit(w: World, d: Decision, origin: DecisionOrigin): Promise<StoredDecision | null> {
+async function commit(w: World, d: Decision, origin: DecisionOrigin, subject?: string): Promise<StoredDecision | null> {
   if (hasDecision(d.id)) return null;
   const contact = w.contacts.find((c) => c.id === d.contactId);
   const pauses = toPause(w, d);
@@ -31,6 +33,7 @@ async function commit(w: World, d: Decision, origin: DecisionOrigin): Promise<St
   const stored: StoredDecision = {
     ...d,
     origin,
+    subject,
     contactName: contact?.name ?? d.contactId,
     companyId: contact?.companyId ?? "",
     writeback: [],
@@ -84,7 +87,7 @@ export async function ingestEnrollment(e: Enrollment, origin: DecisionOrigin = "
   const d = evaluateAction(w, { contactId: e.contactId, action: "enroll", channel: "email", source: "sequence", senderId: e.ownerId, sequenceId: e.sequenceId });
   // A held enrollment is paused right away: put the new sequence in the evidence so commit() pauses it.
   const withSeq = d.decision === "hold" ? { ...d, evidence: [...new Set([...d.evidence, e.sequenceId])] } : d;
-  return commit(w, withSeq, origin);
+  return commit(w, withSeq, origin, `Enrolled in ${e.sequenceName}`);
 }
 
 /**
@@ -95,7 +98,8 @@ export async function ingestEnrollment(e: Enrollment, origin: DecisionOrigin = "
 export async function preflight(a: ProposedAction): Promise<StoredDecision | Decision> {
   const w = currentWorld();
   const d = evaluateAction(w, a);
-  const stored = (await commit(w, d, "preflight")) ?? state().decisions.find((x) => x.id === d.id);
+  const sender = w.senders.find((x) => x.id === a.senderId)?.name ?? a.senderId;
+  const stored = (await commit(w, d, "preflight", `${sender} · ${CHANNEL_LABEL[a.channel] ?? a.channel}`)) ?? state().decisions.find((x) => x.id === d.id);
   if (!stored || !a.snippet || stored.llm) return stored ?? d;
 
   const ownerId = d.instead?.ownerId;
@@ -134,17 +138,57 @@ export function stats(w: World = currentWorld()): Stats {
   };
 }
 
+/** Live counts for the dashboard's Listen → Decide → Act strip. */
+export function flow(w: World = currentWorld()) {
+  const ds = state().decisions;
+  // Count what is on the graph8 record: fresh writes plus notes/tasks graph8 already had for a decision.
+  const ops = ds.flatMap((d) =>
+    d.writeback
+      .filter((x) => x.ok)
+      .map((x) => {
+        const a = x.args as { note?: string; task?: string } | undefined;
+        if (x.op !== "skip") return x;
+        return a?.note ? { ...x, op: "notes.create" } : a?.task ? { ...x, op: "tasks.create" } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x),
+  );
+  const count = (op: string) => ops.filter((x) => x.op === op).length;
+  const week = Date.now() - 7 * 24 * 3600_000;
+  return {
+    touches: w.touches.filter((t) => new Date(t.timestamp).getTime() >= week).length,
+    liveEvents: state().liveTouches.length,
+    senders: new Set(w.touches.map((t) => t.senderId)).size,
+    decisions: ds.length,
+    byKind: Object.fromEntries(["hold", "delay", "reroute", "escalate", "allow"].map((k) => [k, ds.filter((d) => d.decision === k).length])),
+    writes: { notes: count("notes.create"), tasks: count("tasks.create"), fields: count("fields.setValue"), pauses: count("sequences.pauseSequenceContact") },
+    live: ops.some((x) => x.mode === "live"),
+  };
+}
+
 export function heatmap(w: World = currentWorld()) {
+  const week = Date.now() - 7 * 24 * 3600_000;
   return w.companies
-    .map((co) => ({
-      id: co.id,
-      name: co.name,
-      score: accountScore(w, co.id),
-      deal: w.deals.find((d) => d.companyId === co.id && d.open) ?? null,
-      contacts: w.contacts
-        .filter((c) => c.companyId === co.id)
-        .map((c) => ({ id: c.id, name: c.name, title: c.title, score: harmonyScore(w, c.id).score }))
-        .sort((a, b) => a.score - b.score),
-    }))
+    .map((co) => {
+      const people = w.contacts.filter((c) => c.companyId === co.id);
+      const ids = new Set(people.map((c) => c.id));
+      const recent = w.touches.filter((t) => ids.has(t.contactId) && new Date(t.timestamp).getTime() >= week);
+      const engaged = recent.filter((t) => t.senderId === t.contactId).at(-1);
+      const who = engaged && people.find((c) => c.id === engaged.contactId)?.name.split(" ")[0];
+      const outbound = recent.filter((t) => t.senderId !== t.contactId);
+      const headline = engaged
+        ? `${who} ${engaged.channel === "meeting" ? "booked a meeting" : "replied"} · ${outbound.length} touches this week`
+        : `${outbound.length} touches this week from ${new Set(outbound.map((t) => t.senderId)).size} senders`;
+      return {
+        id: co.id,
+        name: co.name,
+        score: accountScore(w, co.id),
+        headline,
+        held: state().decisions.filter((d) => d.companyId === co.id && d.decision !== "allow").length,
+        deal: w.deals.find((d) => d.companyId === co.id && d.open) ?? null,
+        contacts: people
+          .map((c) => ({ id: c.id, name: c.name, title: c.title, score: harmonyScore(w, c.id).score }))
+          .sort((a, b) => a.score - b.score),
+      };
+    })
     .sort((a, b) => a.score - b.score);
 }

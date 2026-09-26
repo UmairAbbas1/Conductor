@@ -9,6 +9,8 @@ export type DecisionOrigin = "scan" | "event" | "preflight" | "simulate";
 
 export interface StoredDecision extends Decision {
   origin: DecisionOrigin;
+  /** What was being decided, in plain words: "Nova · AI call", "Enrolled in Q4 Cold Outbound". */
+  subject?: string;
   contactName: string;
   companyId: string;
   writeback: WriteLog[];

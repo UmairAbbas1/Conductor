@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentWorld, ensureScanned, heatmap, stats } from "@/lib/engine.ts";
+import { currentWorld, ensureScanned, flow, heatmap, stats } from "@/lib/engine.ts";
 import { resetState, state } from "@/lib/store.ts";
 import { mode } from "@/lib/graph8.ts";
 import { readSeedState } from "@/lib/world.ts";
@@ -20,6 +20,8 @@ export async function GET() {
     senders,
     decisions: state().decisions.slice(0, 40),
     poll: pollStatus(),
+    flow: flow(w),
+    llm: !!process.env.ANTHROPIC_API_KEY,
   });
 }
 

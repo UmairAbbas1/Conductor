@@ -91,7 +91,9 @@ export async function writeBack(world: World, d: Decision, toPause: Enrollment[]
   else await write("notes.create", { contactId, content: note }, () => g8.notes.create(contactId, note), logs);
 
   // 3. A task when someone else should act (reroute / R2 task / escalate).
-  if (!already.task && (d.decision === "escalate" || d.instead?.type === "task" || d.instead?.type === "handoff")) {
+  const wantsTask = d.decision === "escalate" || d.instead?.type === "task" || d.instead?.type === "handoff";
+  if (wantsTask && already.task) logs.push({ at: new Date().toISOString(), mode: mode(), op: "skip", args: { task: "already in graph8" }, ok: true });
+  if (wantsTask && !already.task) {
     const task = {
       title: d.decision === "escalate" ? `Approve or override: ${RULE_TITLE[d.rule]}` : `You own this buyer now: ${RULE_TITLE[d.rule]}`,
       description: `${d.reason}.\nConductor decision ${d.id}.`,

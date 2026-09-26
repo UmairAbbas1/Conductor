@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { scoreColor } from "./ScoreDial.tsx";
 
-interface WriteLog { op: string; mode: string; ok: boolean; error?: string }
+interface WriteLog { op: string; mode: string; ok: boolean; error?: string; args?: Record<string, unknown> }
 interface FeedDecision {
   id: string;
   contactId: string;
   contactName: string;
+  subject?: string;
   rule: string;
   decision: string;
   reason: string;
@@ -17,23 +18,169 @@ interface FeedDecision {
   origin: string;
   instead?: { type: string; ownerId: string };
   writeback: WriteLog[];
-  llm?: { contradiction?: { status: string; contradiction?: boolean; explanation?: string; reason?: string }; merged?: { status: string; message?: string } };
+  llm?: { contradiction?: { status: string; contradiction?: boolean; explanation?: string }; merged?: { status: string; message?: string } };
 }
 interface Account {
   id: string;
   name: string;
   score: number;
+  headline: string;
+  held: number;
   deal: { name: string; amount: number } | null;
   contacts: { id: string; name: string; title: string; score: number }[];
+}
+interface Flow {
+  touches: number;
+  liveEvents: number;
+  senders: number;
+  decisions: number;
+  byKind: Record<string, number>;
+  writes: { notes: number; tasks: number; fields: number; pauses: number };
+  live: boolean;
 }
 interface ApiState {
   mode: "dry" | "live";
   seeded: boolean;
+  llm: boolean;
   stats: { decisions: number; autonomousPct: number; touchesPrevented: number; pipelineProtected: number; pipelineSource: string };
   heatmap: Account[];
   senders: Record<string, string>;
   decisions: FeedDecision[];
   poll: { running: boolean; lastPollAt?: string; error?: string };
+  flow: Flow;
+}
+
+const RULES: Record<string, string> = {
+  R1: "Buyer engaged",
+  R2: "Open deal",
+  R3: "Channel stacking",
+  R4: "Touch budget",
+  R5: "Sender collision",
+  none: "No conflict",
+};
+const KIND: Record<string, { label: string; cls: string }> = {
+  allow: { label: "Allowed", cls: "bg-good/15 text-good" },
+  hold: { label: "Held", cls: "bg-bad/15 text-bad" },
+  delay: { label: "Delayed", cls: "bg-warn/15 text-warn" },
+  reroute: { label: "Rerouted", cls: "bg-accent/15 text-accent" },
+  escalate: { label: "Needs owner", cls: "bg-warn/20 text-warn" },
+};
+const ORIGIN: Record<string, string> = { scan: "standing check", event: "live graph8 event", preflight: "preflight", simulate: "simulated event" };
+
+const ago = (iso?: string) => {
+  if (!iso) return "never";
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${Math.round(s / 3600)}h ago`;
+};
+
+function writtenSummary(w: WriteLog[]): string | null {
+  // A note skipped because graph8 already has it still counts as present on the record.
+  const done = w
+    .filter((x) => x.ok && (x.op !== "skip" || x.args?.note || x.args?.task))
+    .map((x) => (x.op === "skip" ? { ...x, op: x.args?.note ? "notes.create" : "tasks.create" } : x));
+  if (!done.length) return null;
+  const n = (op: string) => done.filter((x) => x.op === op).length;
+  const parts = [
+    n("sequences.pauseSequenceContact") && `paused in ${n("sequences.pauseSequenceContact")} sequence${n("sequences.pauseSequenceContact") > 1 ? "s" : ""}`,
+    n("notes.create") && "note",
+    n("tasks.create") && "task for owner",
+    n("fields.setValue") && `${n("fields.setValue")} fields`,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function Stat({ label, value, hint, accent }: { label: string; value: string; hint: string; accent?: boolean }) {
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border px-5 py-4 ${accent ? "border-accent/40 bg-gradient-to-br from-accent/15 to-panel/70" : "border-line bg-panel/70"}`}>
+      <div className="text-[11px] uppercase tracking-[0.18em] text-mute">{label}</div>
+      <div className="mt-1 font-display text-[44px] leading-none text-text">{value}</div>
+      <div className="mt-1.5 text-[12px] text-soft">{hint}</div>
+    </div>
+  );
+}
+
+function FlowStep({ n, title, big, children }: { n: number; title: string; big: string; children: React.ReactNode }) {
+  return (
+    <div className="flex-1 rounded-2xl border border-line bg-panel/70 p-5">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-mute">
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-accent/20 text-[10px] font-semibold text-accent">{n}</span>
+        {title}
+      </div>
+      <div className="mt-2 text-[17px] font-medium text-text">{big}</div>
+      <div className="mt-2 text-[12.5px] leading-relaxed text-soft">{children}</div>
+    </div>
+  );
+}
+
+function Arrow() {
+  return <div className="hidden shrink-0 items-center text-2xl text-line lg:flex">→</div>;
+}
+
+function AccountRow({ a }: { a: Account }) {
+  const color = scoreColor(a.score);
+  return (
+    <div className="rounded-2xl border border-line bg-panel-2/60 p-4 transition hover:border-card-line">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-medium text-text">{a.name}</span>
+            {a.deal && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent">${a.deal.amount.toLocaleString()} open deal</span>}
+            {a.held > 0 && <span className="rounded-full bg-bad/15 px-2 py-0.5 text-[11px] text-bad">{a.held} held</span>}
+          </div>
+          <div className="mt-1 text-[12.5px] text-soft">{a.headline}</div>
+        </div>
+        <div className="text-right">
+          <div className="font-display text-[40px] leading-none" style={{ color }}>{a.score}</div>
+          <div className="text-[10px] uppercase tracking-wider text-mute">harmony</div>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {a.contacts.map((c) => (
+          <Link key={c.id} href={`/mirror/${c.id}`} className="group rounded-xl border border-line bg-ink/60 px-3 py-2 transition hover:border-accent/50">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-[12.5px] text-text group-hover:text-accent">{c.name}</span>
+              <span className="font-mono text-[12px]" style={{ color: scoreColor(c.score) }}>{c.score}</span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${c.score}%`, background: scoreColor(c.score) }} />
+            </div>
+            <div className="mt-1 truncate text-[10.5px] text-mute">{c.title}</div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DecisionCard({ d, senders, fresh }: { d: FeedDecision; senders: Record<string, string>; fresh: boolean }) {
+  const kind = KIND[d.decision] ?? KIND.hold;
+  const written = writtenSummary(d.writeback);
+  const dry = d.writeback.some((w) => w.mode === "dry" && w.op !== "skip");
+  const owner = d.instead ? senders[d.instead.ownerId] ?? d.instead.ownerId : null;
+  const c = d.llm?.contradiction;
+  return (
+    <li className={`rounded-2xl border bg-panel-2/70 p-4 ${fresh ? "feed-in border-accent/60 shadow-[0_0_30px_-12px_var(--color-accent)]" : "border-line"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider ${kind.cls}`}>{kind.label}</span>
+          <span className="text-[11px] text-mute" title={RULES[d.rule]}>{d.rule} · {RULES[d.rule]}</span>
+        </div>
+        <span className="text-[10.5px] text-mute">{ago(d.createdAt)}</span>
+      </div>
+      <div className="mt-2 text-[14px] text-text">
+        <Link href={`/mirror/${d.contactId}`} className="font-medium hover:text-accent">{d.contactName}</Link>
+        {d.subject && <span className="text-soft"> · {d.subject}</span>}
+      </div>
+      <p className="mt-1 text-[12.5px] leading-snug text-soft">{d.reason}.</p>
+      {c?.status === "ok" && c.contradiction && <p className="mt-1.5 text-[12px] text-bad">✦ AI: {c.explanation}</p>}
+      {d.llm?.merged?.status === "ok" && <p className="mt-1 text-[12px] text-accent">✦ AI merged it into one message from the owner</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2.5 text-[11px]">
+        {owner && <span className="text-soft">→ {d.instead!.type === "task" ? `task for ${owner}` : `${owner} owns this buyer`}</span>}
+        {written && <span className={dry ? "text-warn" : "text-good"}>{dry ? "◌ would write" : "✓ in graph8"}: {written}</span>}
+        <span className="text-mute">{d.autonomous ? "autonomous" : "waiting for owner"} · {ORIGIN[d.origin] ?? d.origin}</span>
+      </div>
+    </li>
+  );
 }
 
 const SIM_KINDS: [string, string][] = [
@@ -45,7 +192,7 @@ const SIM_KINDS: [string, string][] = [
 ];
 
 /** Hidden demo fallback (press "." to toggle): injects graph8-shaped events through the real intake path. */
-function Simulator({ contacts }: { contacts: { id: string; name: string }[] }) {
+function Simulator({ contacts, onClose }: { contacts: { id: string; name: string }[]; onClose: () => void }) {
   const [contact, setContact] = useState(contacts[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const fire = async (kind: string) => {
@@ -55,7 +202,10 @@ function Simulator({ contacts }: { contacts: { id: string; name: string }[] }) {
   };
   return (
     <div className="fixed bottom-5 right-5 z-50 w-80 rounded-2xl border border-line bg-panel p-4 shadow-2xl">
-      <div className="mb-2 text-[10px] uppercase tracking-[0.2em] text-mute">Simulate graph8 event</div>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-mute">Simulate graph8 event</span>
+        <button onClick={onClose} className="text-mute hover:text-text">×</button>
+      </div>
       <select value={contact} onChange={(e) => setContact(e.target.value)} className="mb-3 w-full rounded-lg border border-line bg-panel-2 px-2 py-1.5 text-sm">
         {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
@@ -69,29 +219,6 @@ function Simulator({ contacts }: { contacts: { id: string; name: string }[] }) {
           Reset demo state
         </button>
       </div>
-    </div>
-  );
-}
-
-const KIND: Record<string, string> = {
-  allow: "text-good border-good/40",
-  hold: "text-bad border-bad/40",
-  delay: "text-warn border-warn/40",
-  reroute: "text-accent border-accent/40",
-  escalate: "text-warn border-warn/60 bg-warn/10",
-};
-
-const ago = (iso: string) => {
-  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : `${Math.round(s / 3600)}h ago`;
-};
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-panel/70 px-5 py-4">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-mute">{label}</div>
-      <div className="mt-1 font-display text-4xl">{value}</div>
-      {hint && <div className="text-[11px] text-mute">{hint}</div>}
     </div>
   );
 }
@@ -134,103 +261,103 @@ export function Dashboard() {
     };
   }, []);
 
-  if (!data) return <div className="pt-24 text-center text-mute">Conductor is reading the ledger…</div>;
-  const { stats, heatmap, decisions, senders } = data;
+  if (!data) {
+    return (
+      <div className="grid place-items-center pt-40 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent" />
+        <p className="mt-4 text-sm text-mute">Conductor is reading the ledger…</p>
+      </div>
+    );
+  }
+  const { stats, heatmap, decisions, senders, flow } = data;
+  const wrote = flow.writes.notes + flow.writes.tasks + flow.writes.fields + flow.writes.pauses;
 
   return (
-    <div className="space-y-8 pt-4">
+    <div className="space-y-6 pt-2">
+      {/* Title + system status */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-5xl">One voice per buyer.</h1>
-          <p className="mt-2 max-w-xl text-soft">Every sequence, campaign, dialer, AI agent and rep, coordinated before the buyer feels it.</p>
+          <h1 className="font-display text-[52px] leading-none">One voice per buyer.</h1>
+          <p className="mt-3 max-w-2xl text-[15px] text-soft">
+            Conductor watches every sequence, campaign, dialer, AI agent and rep in graph8, and stops them from talking over each other, before the buyer feels it.
+          </p>
         </div>
-        {!data.seeded && <div className="rounded-full border border-warn/40 px-3 py-1 text-xs text-warn">Scenario only · run npm run seed to connect graph8 records</div>}
+        <div className="flex flex-wrap gap-2 text-[11.5px]">
+          {data.poll.error ? (
+            <span className="rounded-full border border-bad/40 px-3 py-1 text-bad" title={data.poll.error}>● graph8 sync stopped</span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full border border-good/40 px-3 py-1 text-good">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
+              {data.seeded ? `graph8 synced ${ago(data.poll.lastPollAt)}` : "scenario only"}
+            </span>
+          )}
+          <span className={`rounded-full border px-3 py-1 ${data.llm ? "border-accent/40 text-accent" : "border-line text-mute"}`}>
+            {data.llm ? "✦ AI checks on" : "✦ AI checks off · rules only"}
+          </span>
+        </div>
       </div>
 
+      {/* Outcome numbers */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Decisions made" value={String(stats.decisions)} />
-        <Stat label="Autonomous" value={`${stats.autonomousPct}%`} hint="no human needed" />
-        <Stat label="Touches prevented" value={String(stats.touchesPrevented)} />
-        <Stat label="Pipeline protected" value={`$${stats.pipelineProtected.toLocaleString()}`} hint={`open deals on affected accounts · ${stats.pipelineSource}`} />
+        <Stat label="Decisions made" value={String(stats.decisions)} hint="every touch checked before it lands" />
+        <Stat label="Autonomous" value={`${stats.autonomousPct}%`} hint="no human had to step in" />
+        <Stat label="Touches prevented" value={String(stats.touchesPrevented)} hint="held, delayed or rerouted" />
+        <Stat
+          label="Pipeline protected"
+          value={`$${stats.pipelineProtected.toLocaleString()}`}
+          hint={`open deals on affected accounts · ${stats.pipelineSource === "graph8" ? "live from graph8" : "scenario"}`}
+          accent
+        />
+      </div>
+
+      {/* How it works, live */}
+      <div className="flex flex-col gap-3 lg:flex-row">
+        <FlowStep n={1} title="Listen" big={`${flow.touches} touches this week`}>
+          From {flow.senders} senders across sequences, newsletters, dialer, AI voice agents and reps. {flow.liveEvents > 0 ? `${flow.liveEvents} arrived live from graph8.` : "Live graph8 events stream in every 5s."}
+        </FlowStep>
+        <Arrow />
+        <FlowStep n={2} title="Decide" big={`5 rules · ${flow.decisions} decisions`}>
+          {Object.entries(flow.byKind)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => `${v} ${(KIND[k]?.label ?? k).toLowerCase()}`)
+            .join(" · ") || "Nothing to coordinate yet"}. Deterministic, explainable, instant.
+        </FlowStep>
+        <Arrow />
+        <FlowStep n={3} title="Act in graph8" big={`${wrote} ${flow.live ? "actions on graph8 records" : "planned actions"}`}>
+          {flow.writes.notes} notes · {flow.writes.tasks} owner tasks · {flow.writes.fields} field updates · {flow.writes.pauses} sequence pauses. Everything is visible on the record in graph8.
+        </FlowStep>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_440px]">
-        {/* Heatmap */}
-        <section className="rounded-3xl border border-line bg-panel/70 p-6">
-          <div className="mb-4 text-xs uppercase tracking-[0.2em] text-mute">Accounts · worst first</div>
+        {/* Accounts */}
+        <section className="rounded-3xl border border-line bg-panel/70 p-5">
+          <div className="mb-4 flex items-baseline justify-between">
+            <span className="text-[11px] uppercase tracking-[0.2em] text-mute">Accounts · worst experience first</span>
+            <span className="text-[11px] text-mute">click a person to see their inbox</span>
+          </div>
           <div className="space-y-3">
-            {heatmap.map((a) => (
-              <div key={a.id} className="grid grid-cols-[160px_1fr_56px] items-center gap-4">
-                <div>
-                  <div className="font-medium">{a.name}</div>
-                  <div className="text-[11px] text-mute">{a.deal ? `$${a.deal.amount.toLocaleString()} open` : "no open deal"}</div>
-                </div>
-                <div className="flex gap-1.5">
-                  {a.contacts.map((c) => (
-                    <Link
-                      key={c.id}
-                      href={`/mirror/${c.id}`}
-                      title={`${c.name} · ${c.title} · ${c.score}`}
-                      className="group relative h-12 flex-1 rounded-xl transition hover:scale-[1.03]"
-                      style={{ background: scoreColor(c.score), opacity: 0.25 + (1 - c.score / 100) * 0.65 }}
-                    >
-                      <span className="absolute inset-x-2 bottom-1 truncate text-[10px] font-medium text-ink/90">{c.name.split(" ")[0]} · {c.score}</span>
-                    </Link>
-                  ))}
-                </div>
-                <div className="text-right font-display text-4xl leading-none" style={{ color: scoreColor(a.score) }}>{a.score}</div>
-              </div>
-            ))}
+            {heatmap.map((a) => <AccountRow key={a.id} a={a} />)}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-mute">
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-good" />75–100 one voice</span>
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-warn" />45–74 getting noisy</span>
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-bad" />0–44 buyer is being spammed</span>
           </div>
         </section>
 
         {/* Live decision feed */}
-        <section className="rounded-3xl border border-line bg-panel/70 p-6">
+        <section className="rounded-3xl border border-line bg-panel/70 p-5">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-xs uppercase tracking-[0.2em] text-mute">Decision feed</span>
-            {data.poll.error ? (
-              <span className="text-[11px] text-bad" title={data.poll.error}>graph8 polling stopped</span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-[11px] text-good" title={data.poll.lastPollAt ? `last graph8 poll ${ago(data.poll.lastPollAt)}` : "waiting for seed"}>
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />
-                {data.seeded && data.poll.running ? "live · graph8 every 5s" : "live"}
-              </span>
-            )}
+            <span className="text-[11px] uppercase tracking-[0.2em] text-mute">Decision feed</span>
+            <span className="flex items-center gap-1.5 text-[11px] text-good"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" />live</span>
           </div>
-          <ol className="scroll-thin max-h-[560px] space-y-3 overflow-y-auto pr-1">
-            {decisions.map((d) => (
-              <li key={d.id} className={`rounded-2xl border border-line bg-panel-2 p-4 ${fresh.has(d.id) ? "feed-in ring-1 ring-accent/50" : ""}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`rounded-full border px-2 py-px text-[10px] font-semibold uppercase tracking-wider ${KIND[d.decision]}`}>{d.decision}</span>
-                    <span className="font-mono text-[11px] text-mute">{d.rule}</span>
-                    <Link href={`/mirror/${d.contactId}`} className="text-sm font-medium hover:underline">{d.contactName}</Link>
-                  </div>
-                  <span className="text-[10px] text-mute">{ago(d.createdAt)}</span>
-                </div>
-                <p className="mt-2 text-[13px] leading-snug text-soft">{d.reason}</p>
-                {d.llm?.contradiction?.status === "ok" && d.llm.contradiction.contradiction && (
-                  <p className="mt-1.5 text-[12px] text-bad">✦ LLM: {d.llm.contradiction.explanation}</p>
-                )}
-                {d.llm?.contradiction?.status === "skipped" && <p className="mt-1.5 text-[11px] text-mute">✦ LLM check skipped ({d.llm.contradiction.reason})</p>}
-                {d.llm?.merged?.status === "ok" && <p className="mt-1.5 text-[12px] text-accent">✦ Merged into one message from the owner</p>}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-mute">
-                  {d.instead && <span>→ {d.instead.type.replace("_", " ")}: {senders[d.instead.ownerId] ?? d.instead.ownerId}</span>}
-                  <span>{d.autonomous ? "autonomous" : "waiting for owner"}</span>
-                  <span>via {d.origin}</span>
-                  {d.writeback.length > 0 && (
-                    <span title={d.writeback.map((w) => `${w.mode}: ${w.op}${w.ok ? "" : ` ✗ ${w.error}`}`).join("\n")}>
-                      graph8: {d.writeback.filter((w) => w.op !== "skip").length || "skipped"} {d.writeback[0]?.mode === "dry" && d.writeback[0]?.op !== "skip" ? "(dry)" : ""}
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-            {decisions.length === 0 && <li className="py-10 text-center text-sm text-mute">No conflicts right now.</li>}
+          <ol className="scroll-thin max-h-[720px] space-y-3 overflow-y-auto pr-1">
+            {decisions.map((d) => <DecisionCard key={d.id} d={d} senders={senders} fresh={fresh.has(d.id)} />)}
+            {decisions.length === 0 && <li className="py-12 text-center text-sm text-mute">All buyers hear one voice right now.</li>}
           </ol>
         </section>
       </div>
-      {sim && <Simulator contacts={heatmap.flatMap((a) => a.contacts)} />}
+      {sim && <Simulator contacts={heatmap.flatMap((a) => a.contacts)} onClose={() => setSim(false)} />}
     </div>
   );
 }

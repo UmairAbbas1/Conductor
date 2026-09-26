@@ -16,6 +16,8 @@ export interface Violation {
 const ms = (iso: string) => new Date(iso).getTime();
 const byTime = (a: Touch, b: Touch) => ms(a.timestamp) - ms(b.timestamp);
 
+const CHANNEL_WORD: Record<string, string> = { email: "email", sms: "SMS", linkedin: "LinkedIn message", call: "call", voice_agent: "AI call", newsletter: "newsletter", meeting: "meeting" };
+
 export const isCold = (t: Touch) =>
   !isInbound(t) && t.channel !== "newsletter" && CONFIG.coldSources.includes(t.source);
 
@@ -47,14 +49,14 @@ export function findViolations(world: World, contactId: string): Violation[] {
     if (isCold(t)) {
       const own = mine.find((e) => isEngagement(e) && ms(e.timestamp) < at);
       const colleague = t.source === "sequence" ? colleagueEngagements.find((e) => ms(e.timestamp) < at) : undefined;
-      if (own) add("R1", t, `Automated ${t.channel} after the buyer ${own.channel === "meeting" ? "booked a meeting" : "replied"}`, [own.refId, t.refId]);
+      if (own) add("R1", t, `Automated ${CHANNEL_WORD[t.channel] ?? t.channel} after the buyer ${own.channel === "meeting" ? "booked a meeting" : "replied"}`, [own.refId, t.refId]);
       else if (colleague) add("R1", t, "Cold sequence after a colleague at the same company engaged", [colleague.refId, t.refId]);
     }
 
     // R2: cold touch while the company has an open deal, from anyone but the deal owner.
     const dealOpenAtTouch = openDeal && (!openDeal.openedAt || ms(openDeal.openedAt) <= at);
     if (openDeal && dealOpenAtTouch && isCold(t) && t.senderId !== openDeal.ownerId) {
-      add("R2", t, `Cold ${t.channel} while ${openDeal.name} is open`, [openDeal.id, t.refId]);
+      add("R2", t, `Cold ${CHANNEL_WORD[t.channel] ?? t.channel} while ${openDeal.name} is open`, [openDeal.id, t.refId]);
     }
 
     // R3: this touch adds a 3rd+ distinct channel within 24h.
