@@ -55,7 +55,7 @@ If graph8 or the network misbehaves on stage, every beat below still works: the 
 
 ### 3:40 – 4:20 · Any agent can ask first
 
-- In a terminal: `npm run mcp` (or Claude Code with `.mcp.json`) → `conductor_preflight` for `sarah` / `voice_agent` / `nova`.
+- In the VS Code terminal: `npm run ask -- sarah voice_agent nova`. It asks the live Conductor exactly what an AI agent would (the same call the `conductor_preflight` MCP tool makes).
 - The answer: `HOLD (R1): Sarah booked a meeting. Automated outreach is paused`.
 
 > "Any AI agent, whether graph8's or yours, asks Conductor before it touches a buyer. `POST /api/preflight` does the same over HTTP."
