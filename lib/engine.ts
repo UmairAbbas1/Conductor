@@ -1,4 +1,4 @@
-import { buildWorld, readSeedState } from "./world.ts";
+import { buildWorld, findContact, readSeedState } from "./world.ts";
 import { evaluateAction, evaluateContact, type ProposedAction } from "./policies.ts";
 import { writeBack } from "./writeback.ts";
 import { checkContradiction, mergeMessages } from "./llm.ts";
@@ -96,8 +96,12 @@ export async function ingestEnrollment(e: Enrollment, origin: DecisionOrigin = "
  * the message text, the LLM layer also (a) checks it against what the buyer already did and (b) for a
  * blocked message with an owner, merges it with the owner's last message into one voice.
  */
-export async function preflight(a: ProposedAction): Promise<StoredDecision | Decision> {
+export async function preflight(input: ProposedAction): Promise<StoredDecision | Decision> {
   const w = currentWorld();
+  // Accept a graph8 contact id or a demo key ("sarah"); agents shouldn't need to know which.
+  const contact = findContact(w, input.contactId);
+  if (!contact) return evaluateAction(w, input); // answer, but don't record decisions about unknown contacts
+  const a = { ...input, contactId: contact.id };
   const d = evaluateAction(w, a);
   const sender = w.senders.find((x) => x.id === a.senderId)?.name ?? a.senderId;
   const stored = (await commit(w, d, "preflight", `${sender} · ${CHANNEL_LABEL[a.channel] ?? a.channel}`)) ?? state().decisions.find((x) => x.id === d.id);

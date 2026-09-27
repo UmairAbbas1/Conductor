@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { handleEvent } from "../lib/intake.ts";
-import { scan } from "../lib/engine.ts";
+import { preflight, scan } from "../lib/engine.ts";
 import { resetState, state } from "../lib/store.ts";
 
 // A seeded world (numeric graph8 ids), in dry mode: write-back logs instead of calling graph8.
@@ -24,6 +24,13 @@ beforeAll(() => {
 afterAll(() => {
   delete process.env.CONDUCTOR_SEED_STATE;
   resetState();
+});
+
+describe("preflight on a seeded world", () => {
+  it("accepts a demo key and resolves it to the graph8 id", async () => {
+    const d = await preflight({ contactId: "sarah", action: "send", channel: "voice_agent", source: "agent", senderId: "nova" });
+    expect(d).toMatchObject({ contactId: "101", rule: "R1", decision: "hold" });
+  });
 });
 
 describe("real enrollments are always stopped in graph8", () => {

@@ -30,7 +30,8 @@
     "reset": "node seed/reset.ts",
     "mcp": "node mcp/conductor.ts",
     "webhook": "node seed/webhook.ts",
-    "enroll": "node seed/enroll.ts"
+    "enroll": "node seed/enroll.ts",
+    "ask": "node seed/ask.ts"
   },
   "engines": {
     "node": ">=22.18"
