@@ -60,6 +60,7 @@ UI: dark, calm, premium. Mirror looks like a real phone/inbox. Score = large dia
   first switch to live mode; changing a locked decision; any graph8 call failing the same way 3×.
 - No auth, accounts, extra pages or abstractions beyond the brief. Boring, reliable code.
 - Cut order if short on time: Replay → MCP tool → LLM merge. Never cut Mirror, R1, R2, write-back.
+- Never run `next build` while `next dev` is running in this folder: both use `.next` and the dev workers crash ("Jest worker encountered child process exceptions"). Fix: stop dev, delete `.next`, restart.
 - Deploy: Vercel CLI. `.vercelignore` keeps `.env*` and `data/` out of uploads; secrets go to Vercel env vars only.
 - Progress format: `✅ [what] — [files]`; end of phase: shipped / next / blocked.
 
