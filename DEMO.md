@@ -34,12 +34,15 @@ If graph8 or the network misbehaves on stage, every beat below still works: the 
 
 ### 1:45 – 2:50 · Live: someone breaks the rules
 
-> "Now, live. I'll enroll Omar, Sarah's colleague, into a cold sequence in graph8."
+> "Now, live. An SDR enrolls Hina, Sarah's colleague, into a cold sequence in graph8."
 
-- **In graph8:** add **Omar Farooq** to *Bilal — Ops Leaders Cold Outbound*. Within about 5–10 seconds the dashboard feed shows **HELD · R1 · Omar Farooq · Enrolled in Bilal — Ops Leaders Cold Outbound**.
-- **Fallback:** press `.`, choose **Omar Farooq**, then **Enrolled in SDR sequence**.
+- **In the VS Code terminal:** `npm run enroll -- hina`. This enrolls her through graph8's official API, exactly as any tool or agent would. Within about 5–10 seconds the dashboard feed shows **HELD · R1 · Hina Malik · Enrolled in Bilal — Ops Leaders Cold Outbound**.
+- **In graph8:** open **Hina's contact record** (not the sequence's Contacts tab; see below). It shows the Conductor note and the task for the owner.
+- **Fallback:** on the dashboard, press `.`, choose **Hina Malik**, then **Enrolled in SDR sequence**.
 
-> "His colleague already booked. Conductor stopped him before step one went out (graph8 shows him removed from the sequence) and left Ali a note and a task on Omar's record."
+> "Her colleague already booked. Conductor stopped her before step one went out, removed her from the sequence in graph8, and left Ali a note and a task on her record."
+
+⚠️ **Avoid graph8's sequence → Contacts tab.** graph8's own page currently crashes ("et.find is not a function") on a draft sequence that has a removed contact. The data is valid (graph8's API returns it correctly), so this is a graph8 UI bug. The sequence's **Overview** tab and the **contact records** work fine.
 
 ### 2:50 – 3:40 · The AI part (Mirror tab, scroll to "Queued next")
 
@@ -74,4 +77,4 @@ If graph8 or the network misbehaves on stage, every beat below still works: the 
 - *What if two decisions race?* The decision is stored before any graph8 call, IDs are deterministic, and write-back checks graph8 first. Nothing is written twice.
 - *Does it send anything?* No. It only holds, delays, reroutes or escalates, plus notes, tasks and fields. Everything it wrote is tagged demo data.
 
-**Before the demo:** Omar is already enrolled and removed from the live test (27 Sep). To show the live catch again on stage, enroll **Hina Malik** instead: same rule (her colleague Sarah booked), same result.
+**Before the demo:** Omar was used for the live test on 27 Sep (caught in 4s, removed from the sequence, note and task on his record). Use **Hina** on stage.
