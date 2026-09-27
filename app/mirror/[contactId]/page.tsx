@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { findContact } from "@/lib/world.ts";
-import { currentWorld } from "@/lib/engine.ts";
+import { currentWorld, ensureScanned } from "@/lib/engine.ts";
 import { state } from "@/lib/store.ts";
 import { buildMirror, type MirrorItem } from "@/lib/mirror.ts";
 import { CONFIG } from "@/lib/config.ts";
@@ -94,6 +94,7 @@ function Metric({ value, label, bad }: { value: number; label: string; bad?: boo
 
 export default async function MirrorPage({ params }: { params: Promise<{ contactId: string }> }) {
   const { contactId } = await params;
+  await ensureScanned(); // serverless: this instance may not have scanned yet
   const world = currentWorld();
   const contact = findContact(world, decodeURIComponent(contactId));
   if (!contact) notFound();
