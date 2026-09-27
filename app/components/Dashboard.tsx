@@ -90,31 +90,28 @@ function writtenSummary(w: WriteLog[]): string | null {
   return parts.join(" · ");
 }
 
-function Stat({ label, value, hint, accent }: { label: string; value: string; hint: string; accent?: boolean }) {
+function Stat({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: boolean }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl border px-5 py-4 ${accent ? "border-accent/40 bg-gradient-to-br from-accent/15 to-panel/70" : "border-line bg-panel/70"}`}>
-      <div className="text-[11px] uppercase tracking-[0.18em] text-mute">{label}</div>
-      <div className="mt-1 font-display text-[44px] leading-none text-text">{value}</div>
-      <div className="mt-1.5 text-[12px] text-soft">{hint}</div>
+    <div className={`rounded-2xl border px-5 py-4 ${accent ? "border-accent/40 bg-gradient-to-br from-accent/15 to-panel/70" : "border-line bg-panel/70"}`}>
+      <div className="font-display text-[46px] leading-none text-text">{value}</div>
+      <div className="mt-2 text-[11px] uppercase tracking-[0.16em] text-mute">{label}</div>
+      {hint && <div className="mt-0.5 text-[11px] text-accent">{hint}</div>}
     </div>
   );
 }
 
-function FlowStep({ n, title, big, children }: { n: number; title: string; big: string; children: React.ReactNode }) {
+function FlowStep({ n, title, big }: { n: number; title: string; big: string }) {
   return (
-    <div className="flex-1 rounded-2xl border border-line bg-panel/70 p-5">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-mute">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-accent/20 text-[10px] font-semibold text-accent">{n}</span>
-        {title}
-      </div>
-      <div className="mt-2 text-[17px] font-medium text-text">{big}</div>
-      <div className="mt-2 text-[12.5px] leading-relaxed text-soft">{children}</div>
+    <div className="flex flex-1 items-center gap-3 rounded-2xl border border-line bg-panel/70 px-4 py-3">
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent/20 text-[11px] font-semibold text-accent">{n}</span>
+      <span className="text-[11px] uppercase tracking-[0.16em] text-mute">{title}</span>
+      <span className="ml-auto text-[14px] font-medium text-text">{big}</span>
     </div>
   );
 }
 
 function Arrow() {
-  return <div className="hidden shrink-0 items-center text-2xl text-line lg:flex">→</div>;
+  return <div className="hidden shrink-0 items-center text-lg text-mute lg:flex">→</div>;
 }
 
 function AccountRow({ a }: { a: Account }) {
@@ -145,7 +142,6 @@ function AccountRow({ a }: { a: Account }) {
             <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-line">
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${c.score}%`, background: scoreColor(c.score) }} />
             </div>
-            <div className="mt-1 truncate text-[10.5px] text-mute">{c.title}</div>
           </Link>
         ))}
       </div>
@@ -172,13 +168,12 @@ function DecisionCard({ d, senders, fresh }: { d: FeedDecision; senders: Record<
         <Link href={`/mirror/${d.contactId}`} className="font-medium hover:text-accent">{d.contactName}</Link>
         {d.subject && <span className="text-soft"> · {d.subject}</span>}
       </div>
-      <p className="mt-1 text-[12.5px] leading-snug text-soft">{d.reason}.</p>
-      {c?.status === "ok" && c.contradiction && <p className="mt-1.5 text-[12px] text-bad">✦ AI: {c.explanation}</p>}
-      {d.llm?.merged?.status === "ok" && <p className="mt-1 text-[12px] text-accent">✦ AI merged it into one message from the owner</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2.5 text-[11px]">
-        {owner && <span className="text-soft">→ {d.instead!.type === "task" ? `task for ${owner}` : `${owner} owns this buyer`}</span>}
-        {written && <span className={dry ? "text-warn" : "text-good"}>{dry ? "◌ would write" : "✓ in graph8"}: {written}</span>}
-        <span className="text-mute">{d.autonomous ? "autonomous" : "waiting for owner"} · {ORIGIN[d.origin] ?? d.origin}</span>
+      <p className="mt-1 line-clamp-1 text-[12.5px] text-soft" title={d.reason}>{d.reason}</p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[10.5px]">
+        {owner && <span className="rounded-full bg-ink/70 px-2 py-0.5 text-soft ring-1 ring-line">→ {owner.split(" ")[0]}</span>}
+        {written && <span className={`rounded-full px-2 py-0.5 ring-1 ${dry ? "text-warn ring-warn/30" : "text-good ring-good/30"}`} title={written}>{dry ? "◌ dry run" : "✓ in graph8"}</span>}
+        {c?.status === "ok" && c.contradiction && <span className="rounded-full px-2 py-0.5 text-bad ring-1 ring-bad/30" title={c.explanation}>✦ AI: contradiction</span>}
+        {d.llm?.merged?.status === "ok" && <span className="rounded-full px-2 py-0.5 text-accent ring-1 ring-accent/30">✦ merged</span>}
       </div>
     </li>
   );
@@ -279,9 +274,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-[52px] leading-none">One voice per buyer.</h1>
-          <p className="mt-3 max-w-2xl text-[15px] text-soft">
-            Conductor watches every sequence, campaign, dialer, AI agent and rep in graph8, and stops them from talking over each other, before the buyer feels it.
-          </p>
+          <p className="mt-3 text-[15px] text-soft">Every graph8 tool, coordinated before the buyer feels it.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-[11.5px]">
           {data.poll.error ? (
@@ -300,49 +293,27 @@ export function Dashboard() {
 
       {/* Outcome numbers */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Decisions made" value={String(stats.decisions)} hint="every touch checked before it lands" />
-        <Stat label="Autonomous" value={`${stats.autonomousPct}%`} hint="no human had to step in" />
-        <Stat label="Touches prevented" value={String(stats.touchesPrevented)} hint="held, delayed or rerouted" />
-        <Stat
-          label="Pipeline protected"
-          value={`$${stats.pipelineProtected.toLocaleString()}`}
-          hint={`open deals on affected accounts · ${stats.pipelineSource === "graph8" ? "live from graph8" : "scenario"}`}
-          accent
-        />
+        <Stat label="Decisions" value={String(stats.decisions)} />
+        <Stat label="Autonomous" value={`${stats.autonomousPct}%`} />
+        <Stat label="Touches prevented" value={String(stats.touchesPrevented)} />
+        <Stat label="Pipeline protected" value={`$${stats.pipelineProtected.toLocaleString()}`} hint={stats.pipelineSource === "graph8" ? "live from graph8" : undefined} accent />
       </div>
 
       {/* How it works, live */}
-      <div className="flex flex-col gap-3 lg:flex-row">
-        <FlowStep n={1} title="Listen" big={`${flow.touches} touches this week`}>
-          From {flow.senders} senders across sequences, newsletters, dialer, AI voice agents and reps. {flow.liveEvents > 0 ? `${flow.liveEvents} arrived live from graph8.` : "Live graph8 events stream in every 5s."}
-        </FlowStep>
+      <div className="flex flex-col gap-2 lg:flex-row">
+        <FlowStep n={1} title="Listen" big={`${flow.touches} touches`} />
         <Arrow />
-        <FlowStep n={2} title="Decide" big={`5 rules · ${flow.decisions} decisions`}>
-          {Object.entries(flow.byKind)
-            .filter(([, v]) => v > 0)
-            .map(([k, v]) => `${v} ${(KIND[k]?.label ?? k).toLowerCase()}`)
-            .join(" · ") || "Nothing to coordinate yet"}. Deterministic, explainable, instant.
-        </FlowStep>
+        <FlowStep n={2} title="Decide" big={`${flow.decisions} decisions`} />
         <Arrow />
-        <FlowStep n={3} title="Act in graph8" big={`${wrote} ${flow.live ? "actions on graph8 records" : "planned actions"}`}>
-          {flow.writes.notes} notes · {flow.writes.tasks} owner tasks · {flow.writes.fields} field updates · {flow.writes.pauses} sequence stops. Everything is visible on the record in graph8.
-        </FlowStep>
+        <FlowStep n={3} title="Act in graph8" big={`${wrote} actions`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_440px]">
         {/* Accounts */}
         <section className="rounded-3xl border border-line bg-panel/70 p-5">
-          <div className="mb-4 flex items-baseline justify-between">
-            <span className="text-[11px] uppercase tracking-[0.2em] text-mute">Accounts · worst experience first</span>
-            <span className="text-[11px] text-mute">click a person to see their inbox</span>
-          </div>
+          <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-mute">Accounts</div>
           <div className="space-y-3">
             {heatmap.map((a) => <AccountRow key={a.id} a={a} />)}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-mute">
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-good" />75–100 one voice</span>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-warn" />45–74 getting noisy</span>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-bad" />0–44 buyer is being spammed</span>
           </div>
         </section>
 
