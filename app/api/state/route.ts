@@ -3,13 +3,15 @@ import { currentWorld, ensureScanned, flow, heatmap, stats } from "@/lib/engine.
 import { resetState, state } from "@/lib/store.ts";
 import { mode } from "@/lib/graph8.ts";
 import { readSeedState } from "@/lib/world.ts";
-import { pollStatus } from "@/lib/poller.ts";
+import { maybePoll, pollStatus } from "@/lib/poller.ts";
+import { llmEnabled } from "@/lib/llm.ts";
 
 export const dynamic = "force-dynamic";
 
 /** Everything the dashboard needs, in one poll. */
 export async function GET() {
   await ensureScanned();
+  await maybePoll();
   const w = currentWorld();
   const senders = Object.fromEntries(w.senders.map((s) => [s.id, `${s.name} (${s.role})`]));
   return NextResponse.json({
@@ -21,7 +23,7 @@ export async function GET() {
     decisions: state().decisions.slice(0, 40),
     poll: pollStatus(),
     flow: flow(w),
-    llm: !!process.env.ANTHROPIC_API_KEY,
+    llm: llmEnabled(),
   });
 }
 

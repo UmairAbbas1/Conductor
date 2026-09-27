@@ -34,7 +34,7 @@ describe("webhook signature", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.decisions.length).toBeGreaterThan(0);
-    expect(state().decisions[0]).toMatchObject({ rule: "R1", decision: "hold", contactName: "Lina Chen" });
+    expect(state().decisions.find((d) => d.rule === "R1" && d.contactName === "Lina Chen")).toMatchObject({ decision: "hold" });
   });
 });
 

@@ -28,8 +28,8 @@ Nothing in that week was misconfigured. Every tool did its job; nobody coordinat
 | **Write-back** | Note on the contact, a task for the owner, `harmony_score` / `touch_budget_remaining` / `conductor_hold` fields, and per-contact sequence pause ([lib/writeback.ts](lib/writeback.ts)). |
 | **Real-time** | Signed graph8 webhooks, plus a 5-second polling fallback, plus a hidden simulator. All three go through one intake path ([lib/intake.ts](lib/intake.ts)). |
 | **Preflight** | `POST /api/preflight` and the `conductor_preflight` MCP tool, so any agent can ask before it acts. |
-| **LLM layer** | Only two jobs: flag a queued message that contradicts what the buyer did, and merge two colliding messages into one from the owner. With no key, the rules still run and the UI says "LLM check skipped" ([lib/llm.ts](lib/llm.ts)). |
-| **Dashboard** | Account heatmap sorted by score, a live decision feed, decisions made, % autonomous, touches prevented, and pipeline protected. |
+| **LLM layer** | Groq, only two jobs: flag a queued message that contradicts what the buyer did, and merge two colliding messages into one from the owner. With no key, a timeout or a bad response, the rules still run and the UI says "AI check off" ([lib/llm.ts](lib/llm.ts)). |
+| **Dashboard** | Outcome KPIs, a live Listen → Decide → Act strip, accounts sorted by score, and a plain-language decision feed showing what landed on each graph8 record. |
 
 ### Rules
 
@@ -62,7 +62,7 @@ flowchart LR
   LEDGER --> RULES{{R1–R5 policy engine}}
   AGENT[Any AI agent] -- conductor_preflight MCP --> PF[/api/preflight/]
   PF --> RULES
-  PF -. message text .-> LLM[Claude: contradiction check + merge]
+  PF -. message text .-> LLM[Groq LLM: contradiction check + merge]
   RULES --> DEC[(Decision store)]
   DEC --> WB[write-back]
   WB -- pause per contact · note · task · fields --> REC
@@ -77,10 +77,10 @@ Requires Node 22.18+ (TypeScript runs natively, so no build step is needed for s
 
 ```bash
 npm install
-# .env.local: G8_API_KEY=..., CONDUCTOR_MODE=dry, optional ANTHROPIC_API_KEY, optional G8_WEBHOOK_SECRET
+# .env.local: G8_API_KEY=..., CONDUCTOR_MODE=dry, optional GROQ_API_KEY, optional G8_WEBHOOK_SECRET
 npm run seed        # create the tagged Acme scenario in graph8 (idempotent; dry mode only logs)
 npm run dev         # http://localhost:3000
-npm test            # rules, score, ledger, write-back, webhooks, LLM fallback, replay
+npm test            # rules, score, ledger, write-back, webhooks, AI fallback, replay, concurrency
 npm run build
 ```
 
@@ -89,6 +89,23 @@ npm run build
 - `npm run mcp` starts the `conductor_preflight` stdio MCP server (it is also registered in `.mcp.json`).
 - `npm run webhook -- https://<public-url>` subscribes graph8 webhooks and stores the signing secret in `.env.local`. This is optional; polling works without a public URL.
 - On the dashboard, press `.` (or open `/?sim`) for the demo simulator.
+- `/replay?autoplay` plays Sarah's week on load; `/replay?at=8` freezes on the moment the AI call is held.
+
+## Deploy (Vercel)
+
+```bash
+npx vercel link                       # once
+npx vercel env add G8_API_KEY production          # paste the key when prompted
+npx vercel env add CONDUCTOR_MODE production      # live
+npx vercel env add GROQ_API_KEY production        # optional
+npx vercel env add CONDUCTOR_SEED_STATE production  # contents of data/seed-state.json
+npx vercel --prod
+```
+
+On Vercel there is no background process and no permanent disk, so Conductor adapts:
+- **Polling runs per request.** The dashboard asks every 2s, and graph8 is read at most once every 5s.
+- **State lives in `/tmp`.** A cold start simply re-scans. Decision IDs are deterministic, and write-back checks graph8 for an existing note or task, so nothing is ever written twice.
+- **The graph8 ID map comes from `CONDUCTOR_SEED_STATE`**, because the gitignored `data/` folder is never uploaded (`.vercelignore`).
 
 ## Safety
 

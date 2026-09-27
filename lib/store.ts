@@ -48,9 +48,14 @@ export function state(): ConductorState {
   return g.__conductor!;
 }
 
+/** Persist best-effort: a read-only or ephemeral disk must never break a decision. */
 export function save() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(FILE, JSON.stringify(state(), null, 2));
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(FILE, JSON.stringify(state(), null, 2));
+  } catch {
+    /* memory state still holds; write-back to graph8 is idempotent, so a cold start just re-scans */
+  }
 }
 
 export function hasDecision(id: string) {

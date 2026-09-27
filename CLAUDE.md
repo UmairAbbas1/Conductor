@@ -40,9 +40,9 @@ breadth of graph8 platform use, 5-minute live demo. Every decision serves these.
 5. **Write-back** — every decision written to graph8: note on contact (why), task for owner when rerouted,
    custom fields `harmony_score` + `touch_budget_remaining`, pause/removal from sequences.
    Only `escalate` waits for a human (graph8 approvals if they exist, else a task).
-6. **LLM layer** (Anthropic, `ANTHROPIC_API_KEY`) — only: (a) flag queued message contradicting known context;
+6. **LLM layer** (Groq via fetch, `GROQ_API_KEY`; switched from Anthropic at the user's request on 2026-09-27) — only: (a) flag queued message contradicting known context;
    (b) merge two colliding queued messages into one from the chosen owner. MUST degrade gracefully:
-   no key / failure → rules still run, UI shows "LLM check skipped".
+   no key / failure → rules still run, UI shows "AI check off".
 7. **Preflight API** — `POST /api/preflight { contactId, action, payload }` → Decision. Plus `conductor_preflight` MCP tool (stdio script).
 8. **Dashboard** — account heatmap sorted by Harmony Score, real-time decision feed, stats: decisions made,
    % autonomous, touches prevented, pipeline protected (sum of open deal amounts on affected accounts, real data only).
@@ -50,7 +50,7 @@ breadth of graph8 platform use, 5-minute live demo. Every decision serves these.
 
 ## Stack
 Next.js App Router + TypeScript + Tailwind, single app. Business logic in `/lib` as plain TS. zod, vitest.
-Pre-approved deps ONLY: next, react, react-dom, typescript, tailwindcss, @graph8/sdk, @anthropic-ai/sdk, zod,
+Pre-approved deps ONLY: next, react, react-dom, typescript, tailwindcss, @graph8/sdk, zod,
 vitest, @modelcontextprotocol/sdk, dotenv. Ask before anything else (incl. tunnels like ngrok/cloudflared).
 UI: dark, calm, premium. Mirror looks like a real phone/inbox. Score = large dial. Feed animates new decisions in.
 
@@ -60,6 +60,7 @@ UI: dark, calm, premium. Mirror looks like a real phone/inbox. Score = large dia
   first switch to live mode; changing a locked decision; any graph8 call failing the same way 3×.
 - No auth, accounts, extra pages or abstractions beyond the brief. Boring, reliable code.
 - Cut order if short on time: Replay → MCP tool → LLM merge. Never cut Mirror, R1, R2, write-back.
+- Deploy: Vercel CLI. `.vercelignore` keeps `.env*` and `data/` out of uploads; secrets go to Vercel env vars only.
 - Progress format: `✅ [what] — [files]`; end of phase: shipped / next / blocked.
 
 <!-- BEGIN:nextjs-agent-rules -->

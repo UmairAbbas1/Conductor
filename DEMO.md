@@ -2,79 +2,74 @@
 
 **Before you go on stage (T-10 min)**
 
-1. `npm run dev`, then open three tabs: `localhost:3000`, `localhost:3000/mirror/sarah`, `localhost:3000/replay`.
-2. Reset the demo state: press `.` on the dashboard, then **Reset demo state**. Reload.
-3. Open the graph8 app on Sarah's contact record in a fourth tab (live mode only).
-4. Check the feed header. It should say **live · graph8 every 5s** (live) or **live** (scenario only). If it says **graph8 polling stopped**, use the simulator for the live beat. Nothing else changes.
+1. Open four tabs: the dashboard `/`, `/mirror/251` (Sarah), `/replay`, and **the graph8 app on Sarah's contact record**.
+2. Reset the demo state: on the dashboard press `.`, then **Reset demo state**, and reload. Nothing in graph8 is duplicated: write-back skips notes and tasks graph8 already has.
+3. Check the header chips: **graph8 synced Xs ago** (green) and **AI checks on** (needs `GROQ_API_KEY`).
+4. Rehearse the Replay once with `/replay?autoplay`.
+
+If graph8 or the network misbehaves on stage, every beat below still works: the simulator (press `.`) uses the same intake code as the live events.
 
 ---
 
-### 0:00 – 0:40 · The problem (Mirror tab)
+### 0:00 – 0:45 · The pain (Mirror tab)
 
-> "This is Sarah Khan, VP Ops at Acme. Acme has a $42K pilot open with our AE, Ali. This is what graph8 sent her last week, from **her** side."
+> "This is Sarah Khan, VP Ops at Acme. Acme has a $42K pilot open with our AE, Ali. This is her phone: everything graph8 sent her this week, from **her** side."
 
-- Scroll the phone slowly.
-- Point at the summary: **11 touches · 4 senders · 6 channels · 3 contradictions**.
-- Point at Wednesday: *she booked a meeting.* Then point at the red cards right after it: Nova the AI agent asks whether she's "still evaluating for October", and Bilal's sequence bumps her twice.
+- The phone opens at her booking. Point at the green bubble: **she booked a meeting.**
+- Point at the red cards right below it: Nova the AI agent asks "still evaluating for October?", and Bilal's sequence bumps her.
+- Read the verdict line: *"After that, 3 automated touches acted as if nothing had happened."*
 
-> "Every tool did its job. Nobody conducted them. Her Harmony Score is **18**."
+> "11 touches, 4 senders, 6 channels. Every tool did its job. Nobody conducted them. Her Harmony Score is **18**."
 
-- Point at **Why the score is 18**: fixed, deterministic penalties for each rule she was hit by.
+- Point at **Why the score is 18**: fixed penalties per rule. Same input, same score, every time.
 
-### 0:40 – 1:40 · What Conductor already did (dashboard tab)
+### 0:45 – 1:45 · Conductor already acted (dashboard tab)
 
-> "Conductor read that ledger and acted, with no human involved."
+> "Conductor listens to everything graph8 sends, decides with five simple rules, and acts inside graph8. With no human."
 
-- Point at the heatmap: Acme is red at 18, Initech is amber, Globex is green.
-- Point at the feed:
-  - **HOLD R1 Sarah**: sequence paused, Ali owns her now.
-  - **HOLD R1 Hina**: her colleague's cold sequence paused.
-  - **HOLD R2 Marco**: Initech has an open deal, so the owner gets a task.
-- Point at the stats: decisions made, **100% autonomous**, touches prevented, **pipeline protected**.
+- Walk the strip left to right: **1 Listen** (touches this week, senders), **2 Decide** (5 rules, N decisions), **3 Act in graph8** (notes, owner tasks, fields).
+- Point at the four numbers: decisions made, **100% autonomous**, touches prevented, **pipeline protected** (live from graph8).
+- Point at a feed card: *"HELD · Sarah Khan · Nova · AI call → Ali owns this buyer · ✓ in graph8: note · 3 fields."*
+- **Switch to the graph8 tab** and show Sarah's record: the Conductor note, the task for the owner, and the `harmony_score` field. *"It's native, right there in graph8."*
 
-> "Every one of those is written into graph8: a note saying why, a task for the owner, and the contact paused in that sequence."
+### 1:45 – 2:50 · Live: someone breaks the rules
 
-*(Live mode: switch to the graph8 tab and show the Conductor note, the task, and `harmony_score` on Sarah's record.)*
+> "Now, live. I'll enroll Omar, Sarah's colleague, into a cold sequence in graph8."
 
-### 1:40 – 2:50 · Live: someone breaks the rules
-
-> "Now, live. Someone enrolls Omar, Sarah's colleague, into a cold sequence."
-
-- **Live mode:** in the graph8 app, add Omar to *Bilal — Ops Leaders Cold Outbound*. Within 5–10 seconds the feed shows **HOLD R1 Omar Farooq** sliding in.
+- **In graph8:** add **Omar Farooq** to *Bilal — Ops Leaders Cold Outbound*. Within about 5–10 seconds the dashboard feed shows **HELD · R1 · Omar Farooq · Enrolled in Bilal — Ops Leaders Cold Outbound**.
 - **Fallback:** press `.`, choose **Omar Farooq**, then **Enrolled in SDR sequence**.
 
-> "A colleague just booked, so Conductor paused the enrollment before step 1 went out."
+> "His colleague already booked. Conductor paused him before step one went out, and left Ali a note on Omar's record."
 
-- Then choose **Lina Chen**, then **Books a meeting**. The feed shows **HOLD R1 Lina**, and her sequence is paused.
+### 2:50 – 3:40 · The AI part (Mirror tab, scroll to "Queued next")
 
-### 2:50 – 3:40 · Queued messages + the AI (Mirror tab, scroll to "Queued next")
+> "These are messages graph8 automations have queued for Sarah right now. Conductor checks each one before it goes."
 
-> "Here's what graph8 automations have queued for Sarah right now."
+- Bilal's "still evaluating for October?" email: **HELD**, with **✦ AI: contradiction** explaining which fact it contradicts.
+- If a merged message appears, point at **One voice · from Ali**: the SDR's and AE's messages rewritten as one.
 
-- Bilal's "still evaluating for October?" email: **HOLD R1**.
-  - ✦ **LLM: contradiction** ("she booked a pilot review…").
-  - **One voice · from Ali**: the merged message Ali can send instead.
-- Nova's AI call: **HOLD R1**.
+> "Rules decide; the model only reads language. If the AI is down, the card says *AI check off* and the rules still hold. The system never depends on the model."
 
-> "Rules decide; the model only reads language. With no Anthropic key, you'd see *LLM check skipped*, and the rules still hold."
+### 3:40 – 4:20 · Any agent can ask first
 
-### 3:40 – 4:30 · Any agent can ask first
+- In a terminal: `npm run mcp` (or Claude Code with `.mcp.json`) → `conductor_preflight` for `sarah` / `voice_agent` / `nova`.
+- The answer: `HOLD (R1): Sarah booked a meeting. Automated outreach is paused`.
 
-- In a terminal (or Claude Code with `.mcp.json`), call `conductor_preflight` for `sarah` / `voice_agent` / `nova`.
-- The result: `HOLD (R1): Sarah booked a meeting. Automated outreach is paused`.
+> "Any AI agent, whether graph8's or yours, asks Conductor before it touches a buyer. `POST /api/preflight` does the same over HTTP."
 
-> "Any agent, whether graph8's or yours, asks Conductor before it touches a buyer. `POST /api/preflight` does the same thing over HTTP."
+### 4:20 – 5:00 · Replay (Replay tab)
 
-### 4:30 – 5:00 · Replay (Replay tab)
+- Click **▶ Play the week**. Each message gets its own beat.
+- Narrate the right-hand panel as blocks appear ("Held · R1 · Nova: Sarah booked a meeting…").
+- It ends at **11 → 3 touches, score 18 → 97**.
 
-- Click **▶ Play the week**.
-
-> "Same week, twice. Left: what she got. Right: Conductor on. It only sees what had happened up to that moment."
-
-- Blocked touches flash red with their rule, then collapse. The count lands at **11 → 3**, and the score dial goes from 18 to above 90.
-
-> "One voice per buyer. It runs on graph8 today, and your reps can use it on Monday morning."
+> "Same week, twice. Conductor only ever saw what had happened up to that moment. One voice per buyer, running on graph8 today, and your reps can use it Monday morning."
 
 ---
 
-**If something breaks:** everything shown also works in dry mode off the local scenario. The simulator uses the same intake code as webhooks and polling. `DELETE /api/state` (or **Reset demo state**) restarts the story.
+**Likely questions, one-line answers**
+
+- *Why not just use graph8's "finish on reply"?* It stops one sequence. Conductor coordinates every sequence, campaign, dialer, AI agent and rep, across the whole account.
+- *Why rules, not AI, for decisions?* Deterministic means explainable, testable (64 tests) and safe to run autonomously. AI only reads language.
+- *What if two decisions race?* The decision is stored before any graph8 call, IDs are deterministic, and write-back checks graph8 first. Nothing is written twice.
+- *Does it send anything?* No. It only holds, delays, reroutes or escalates, plus notes, tasks and fields. Everything it wrote is tagged demo data.

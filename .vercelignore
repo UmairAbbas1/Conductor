@@ -1,0 +1,11 @@
+# Never upload secrets or local state to Vercel
+.env*
+data/
+.mcp.json
+.claude/
+
+# Build output and dependencies are rebuilt remotely
+node_modules
+.next
+*.tsbuildinfo
+*.log

@@ -18,14 +18,25 @@ export interface SeedState {
   fields: Record<string, number>;
 }
 
-export const DATA_DIR = process.env.CONDUCTOR_DATA_DIR ?? path.join(process.cwd(), "data");
+/** Local: ./data. Vercel: the function's writable /tmp (ephemeral; Conductor rebuilds state by re-scanning). */
+export const DATA_DIR = process.env.CONDUCTOR_DATA_DIR ?? (process.env.VERCEL ? "/tmp/conductor" : path.join(process.cwd(), "data"));
 export const SEED_STATE_FILE = path.join(DATA_DIR, "seed-state.json");
 
+/**
+ * The scenario-key → graph8-id map written by `npm run seed`. Read from data/seed-state.json, or, where
+ * there is no local file (Vercel), from the CONDUCTOR_SEED_STATE env var (JSON or base64 JSON).
+ */
 export function readSeedState(): SeedState | null {
   try {
     return JSON.parse(fs.readFileSync(SEED_STATE_FILE, "utf8")) as SeedState;
   } catch {
-    return null;
+    const env = process.env.CONDUCTOR_SEED_STATE;
+    if (!env) return null;
+    try {
+      return JSON.parse(env.trim().startsWith("{") ? env : Buffer.from(env, "base64").toString("utf8")) as SeedState;
+    } catch {
+      return null;
+    }
   }
 }
 
