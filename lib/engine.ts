@@ -25,10 +25,11 @@ function toPause(w: World, d: Decision): Enrollment[] {
  * The decision is stored BEFORE the slow graph8 calls, so a concurrent request for the same
  * situation sees it and never writes a second note or task.
  */
-async function commit(w: World, d: Decision, origin: DecisionOrigin, subject?: string): Promise<StoredDecision | null> {
+async function commit(w: World, d: Decision, origin: DecisionOrigin, subject?: string, stop?: Enrollment[]): Promise<StoredDecision | null> {
   if (hasDecision(d.id)) return null;
   const contact = w.contacts.find((c) => c.id === d.contactId);
-  const pauses = toPause(w, d);
+  // A real enrollment reported by graph8 is always stopped in graph8, even if the scenario already paused it locally.
+  const pauses = stop ?? toPause(w, d);
   for (const e of pauses) markPaused(e.contactId, e.sequenceId);
   const stored: StoredDecision = {
     ...d,
@@ -87,7 +88,7 @@ export async function ingestEnrollment(e: Enrollment, origin: DecisionOrigin = "
   const d = evaluateAction(w, { contactId: e.contactId, action: "enroll", channel: "email", source: "sequence", senderId: e.ownerId, sequenceId: e.sequenceId });
   // A held enrollment is paused right away: put the new sequence in the evidence so commit() pauses it.
   const withSeq = d.decision === "hold" ? { ...d, evidence: [...new Set([...d.evidence, e.sequenceId])] } : d;
-  return commit(w, withSeq, origin, `Enrolled in ${e.sequenceName}`);
+  return commit(w, withSeq, origin, `Enrolled in ${e.sequenceName}`, withSeq.decision === "hold" ? [e] : undefined);
 }
 
 /**
