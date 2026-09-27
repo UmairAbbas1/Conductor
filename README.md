@@ -1,5 +1,7 @@
 # Conductor
 
+**Live demo:** https://conductor-graph8.vercel.app · [Buyer Mirror](https://conductor-graph8.vercel.app/mirror/251) · [Replay](https://conductor-graph8.vercel.app/replay?autoplay)
+
 **One voice per buyer.** Conductor sits across every autonomous touch graph8 sends (sequences, campaigns, SMS, LinkedIn, the dialer, AI voice agents and reps) and coordinates them before the buyer feels it. When Sarah books a meeting, the SDR's sequence, the AI agent's call and the colleague's cold outreach stop on their own, and the deal owner gets a task. Every decision is written back into graph8 as a note, a task, custom fields and per-contact sequence pauses. It is deterministic rules first, with an LLM only where language matters, and it works without a human in the loop.
 
 ## The one-voice story
