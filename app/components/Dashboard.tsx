@@ -82,6 +82,7 @@ function writtenSummary(w: WriteLog[]): string | null {
   const n = (op: string) => done.filter((x) => x.op === op).length;
   const parts = [
     n("sequences.pauseSequenceContact") && `paused in ${n("sequences.pauseSequenceContact")} sequence${n("sequences.pauseSequenceContact") > 1 ? "s" : ""}`,
+    n("contacts.withdrawContactsFromSequences") && "removed from sequence",
     n("notes.create") && "note",
     n("tasks.create") && "task for owner",
     n("fields.setValue") && `${n("fields.setValue")} fields`,
@@ -324,7 +325,7 @@ export function Dashboard() {
         </FlowStep>
         <Arrow />
         <FlowStep n={3} title="Act in graph8" big={`${wrote} ${flow.live ? "actions on graph8 records" : "planned actions"}`}>
-          {flow.writes.notes} notes · {flow.writes.tasks} owner tasks · {flow.writes.fields} field updates · {flow.writes.pauses} sequence pauses. Everything is visible on the record in graph8.
+          {flow.writes.notes} notes · {flow.writes.tasks} owner tasks · {flow.writes.fields} field updates · {flow.writes.pauses} sequence stops. Everything is visible on the record in graph8.
         </FlowStep>
       </div>
 

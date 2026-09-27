@@ -72,7 +72,14 @@ export async function writeBack(world: World, d: Decision, toPause: Enrollment[]
       continue;
     }
     const args = { path: { sequence_id: e.sequenceId, contact_id: contactId } };
-    await write("sequences.pauseSequenceContact", args, () => g8.api.sequences.pauseSequenceContact(args), logs);
+    const paused = await write("sequences.pauseSequenceContact", args, () => g8.api.sequences.pauseSequenceContact(args), logs);
+    // graph8 refuses to pause inside a sequence that isn't running (e.g. "status: drafted").
+    // The brief allows pause OR removal, so withdraw the contact from that sequence instead.
+    const refused = !paused && logs.at(-1)?.op === "sequences.pauseSequenceContact" && !logs.at(-1)!.ok && /status/i.test(logs.at(-1)!.error ?? "");
+    if (refused) {
+      const body = { contact_ids: [contactId], sequence_id: e.sequenceId, target_state: "removed", source: "conductor" };
+      await write("contacts.withdrawContactsFromSequences", body, () => g8.api.contacts.withdrawContactsFromSequences({ body }), logs);
+    }
   }
 
   // Idempotency across restarts/resets: every note and task carries the decision id, so skip

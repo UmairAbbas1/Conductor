@@ -160,7 +160,7 @@ export function flow(w: World = currentWorld()) {
     senders: new Set(w.touches.map((t) => t.senderId)).size,
     decisions: ds.length,
     byKind: Object.fromEntries(["hold", "delay", "reroute", "escalate", "allow"].map((k) => [k, ds.filter((d) => d.decision === k).length])),
-    writes: { notes: count("notes.create"), tasks: count("tasks.create"), fields: count("fields.setValue"), pauses: count("sequences.pauseSequenceContact") },
+    writes: { notes: count("notes.create"), tasks: count("tasks.create"), fields: count("fields.setValue"), pauses: count("sequences.pauseSequenceContact") + count("contacts.withdrawContactsFromSequences") },
     live: ops.some((x) => x.mode === "live"),
   };
 }
