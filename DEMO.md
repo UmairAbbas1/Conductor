@@ -39,7 +39,7 @@ If graph8 or the network misbehaves on stage, every beat below still works: the 
 - **In graph8:** add **Omar Farooq** to *Bilal — Ops Leaders Cold Outbound*. Within about 5–10 seconds the dashboard feed shows **HELD · R1 · Omar Farooq · Enrolled in Bilal — Ops Leaders Cold Outbound**.
 - **Fallback:** press `.`, choose **Omar Farooq**, then **Enrolled in SDR sequence**.
 
-> "His colleague already booked. Conductor paused him before step one went out, and left Ali a note on Omar's record."
+> "His colleague already booked. Conductor stopped him before step one went out (graph8 shows him removed from the sequence) and left Ali a note and a task on Omar's record."
 
 ### 2:50 – 3:40 · The AI part (Mirror tab, scroll to "Queued next")
 
@@ -73,3 +73,5 @@ If graph8 or the network misbehaves on stage, every beat below still works: the 
 - *Why rules, not AI, for decisions?* Deterministic means explainable, testable (64 tests) and safe to run autonomously. AI only reads language.
 - *What if two decisions race?* The decision is stored before any graph8 call, IDs are deterministic, and write-back checks graph8 first. Nothing is written twice.
 - *Does it send anything?* No. It only holds, delays, reroutes or escalates, plus notes, tasks and fields. Everything it wrote is tagged demo data.
+
+**Before the demo:** Omar is already enrolled and removed from the live test (27 Sep). To show the live catch again on stage, enroll **Hina Malik** instead: same rule (her colleague Sarah booked), same result.
